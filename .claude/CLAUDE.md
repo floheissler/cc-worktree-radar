@@ -115,10 +115,16 @@ the module otherwise:
 - A read runs only once a change has settled (`SETTLE_MS`), one at a time
   (`readNow` queues at most one more), and again every `REFRESH_MS` with no
   change seen. A poll is cheap: the branch tips, the worktree list, the
-  holds in the store and, every `SESSIONS_EVERY` polls, `claude agents
-  --json`. The holds are in the fingerprint because another session holds a
-  branch without moving a ref: without them its hold showed only at the
-  next `REFRESH_MS` read (63 s in a live run).
+  holds in the store, the state of the session's own agents that work in a
+  worktree (`$.agent.list()`) and, every `SESSIONS_EVERY` polls, `claude
+  agents --json`. The holds and the agents are in the fingerprint because
+  neither moves a ref: without them another session's hold showed only at
+  the next `REFRESH_MS` read (63 s in a live run), and an agent that
+  finished while its worktree's lock stayed read as at work until then. A
+  live run on 2.1.295 missed an agent's `ready` and `finished` wakes, the
+  agent still read at work 10 s after its hand-back; this is the likeliest
+  cause, not proven: on 2.1.296 (instrumented, twice) the lock went with
+  the agent's last state, which the poll caught anyway.
 - A worktree's `sessions` holds who works there: the sessions
   `claude agents` lists by folder, and subagents (`kind: 'agent'`). A
   subagent runs inside its parent's process, so the CLI lists no session in

@@ -8,7 +8,7 @@ import { gitOf, type Git } from './git'
 import type { Host } from './host'
 import Limits from './limits'
 import { HEADS_FORMAT, parseWorktrees, placeOf } from './repo'
-import { folderKeyOf, parseSessions, SESSIONS_ARGV, type SessionRow } from './sessions'
+import { folderKeyOf, parseSessions, SESSIONS_ARGV, type AgentRow, type SessionRow } from './sessions'
 import { clipChars, sanitize } from './text'
 
 /**
@@ -16,7 +16,7 @@ import { clipChars, sanitize } from './text'
  * reads that follow it, and what a read tells the session.
  *
  * A poll is cheap (the branch tips, the worktree list, the sessions, the
- * holds); a read runs every simulated merge, so it runs only once a change has settled, one
+ * holds, the session's own agents); a read runs every simulated merge, so it runs only once a change has settled, one
  * at a time. The band redraws from the state each read writes.
  */
 
@@ -120,16 +120,25 @@ async function sessionsOf(host: Host): Promise<SessionRow[] | null> {
 }
 
 /**
- * Takes the cheap fingerprint of a repository. The holds are in it: another
- * session holds a branch without moving a ref.
+ * Takes the cheap fingerprint of a repository. Two things in it move no ref:
+ * the holds, which another session sets, and the state of the session's own
+ * agents that work in a worktree, which says whether one is still at work
+ * while its worktree's lock stays.
  *
  * @param host the engine's calls
  * @param git git, bound to the radar's folder
  * @param holds the repository's holds, as the store has them now
+ * @param agents the session's own agents, as `$.agent.list()` has them now
  * @param listed the sessions listed a moment ago, to skip listing them again
  * @returns the fingerprint, or null where git failed
  */
-async function probeOf(host: Host, git: Git, holds: Readonly<Record<string, Hold>>, listed?: SessionRow[] | null): Promise<Probe | null> {
+async function probeOf(
+  host: Host,
+  git: Git,
+  holds: Readonly<Record<string, Hold>>,
+  agents: readonly AgentRow[],
+  listed?: SessionRow[] | null,
+): Promise<Probe | null> {
   const [heads, trees, sessions] = await Promise.all([
     git(['for-each-ref', `--format=${HEADS_FORMAT}`, 'refs/heads']),
     git(['worktree', 'list', '--porcelain']),
@@ -149,8 +158,16 @@ async function probeOf(host: Host, git: Git, holds: Readonly<Record<string, Hold
   const held = Object.entries(holds)
     .map(([branch, hold]) => `${branch}:${hold.at}:${hold.reason}`)
     .sort()
+  // An agent's worktree is named for it, and its lock names it too
+  const working = agents
+    .filter(agent => trees.stdout.includes(`agent-${agent.id}`))
+    .map(agent => `${agent.id}:${agent.status}`)
+    .sort()
 
-  return { fingerprint: [heads.stdout, trees.stdout, sessions === null ? '?' : here.join('\n'), held.join('\n')].join('\0'), sessions }
+  return {
+    fingerprint: [heads.stdout, trees.stdout, sessions === null ? '?' : here.join('\n'), held.join('\n'), working.join('\n')].join('\0'),
+    sessions,
+  }
 }
 
 /**
@@ -252,16 +269,11 @@ export function createRadar(): Radar {
     }
 
     const git = gitOf(host.run, radar.root)
-    const holds = await holdsFor(host, git, radar.root)
-    const probe = await probeOf(host, git, holds)
+    const [holds, agents] = await Promise.all([holdsFor(host, git, radar.root), host.agents()])
+    const probe = await probeOf(host, git, holds, agents)
 
     lastSessions = probe?.sessions
-    const [comments, dueMarks, now, agents] = await Promise.all([
-      host.state.comments.get(),
-      host.state.dueMarks.get(),
-      host.now(),
-      host.agents(),
-    ])
+    const [comments, dueMarks, now] = await Promise.all([host.state.comments.get(), host.state.dueMarks.get(), host.now()])
     const result = await readSnapshot({
       git,
       readText: host.readText,
@@ -340,7 +352,8 @@ export function createRadar(): Radar {
     ticks += 1
 
     const git = gitOf(host.run, radar.root)
-    const probe = await probeOf(host, git, await holdsFor(host, git, radar.root), ticks % SESSIONS_EVERY === 0 ? undefined : lastSessions)
+    const [holds, agents] = await Promise.all([holdsFor(host, git, radar.root), host.agents()])
+    const probe = await probeOf(host, git, holds, agents, ticks % SESSIONS_EVERY === 0 ? undefined : lastSessions)
     const now = await host.now()
 
     lastSessions = probe?.sessions

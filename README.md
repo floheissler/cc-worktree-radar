@@ -79,8 +79,8 @@ Click the controls, or give the band the keyboard (Ctrl+X Tab, or a click) and p
 the letter. On a band narrower than 90 columns the labels shorten to
 `h: ?`, `c: -` and `x: ×`. The `[-]` beside the band is Claude Code's own: it
 hides the band (Ctrl+X Ctrl+A), and a mod cannot move it into the frame. It updates by itself while open: every few seconds the radar checks the
-branch tips, the worktrees, the holds and the running Claude sessions, and
-reads the repository again once a change has settled.
+branch tips, the worktrees, the holds, the running Claude sessions and its
+own subagents, and reads the repository again once a change has settled.
 
 ### Across sessions
 

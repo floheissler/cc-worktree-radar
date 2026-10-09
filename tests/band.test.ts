@@ -431,6 +431,26 @@ describe('wake-ups and notifications', () => {
     expect(prompts).toHaveLength(1)
   })
 
+  test("an agent of the session's own that finishes wakes it, though its worktree's lock stays", async ($, on) => {
+    const agents = { current: [ownAgent('running')] }
+
+    on('agent.list', () => ({ value: agents.current }))
+
+    const { clock, prompts } = worldOf(on, { current: agentLocked(RUNS) })
+    const opened = $.tool.call({ tool: TOOL, action: 'open', wake: ['session-idle'] } as never)
+
+    await settled(clock)
+    await opened
+
+    expect((await bandText($)).some(text => /feat\/landed\s+in progress.*agent: Fix the totals/.test(text))).toBe(true)
+
+    // It finishes; nothing in git moves, the lock not yet gone
+    agents.current = [ownAgent('completed')]
+    await nextRead(clock)
+
+    expect(prompts).toEqual([`worktree-radar: agent agent-abc on feat/landed finished. ${WAKE_NOTE}`])
+  })
+
   test('a wake the session has not taken yet holds up neither the radar nor its own tool', async ($, on) => {
     const runs = { current: blockReady(RUNS), sessions: sessionsOf(['landed-worker', 'landed', 'busy']) }
     const { clock, prompts, turn } = worldOf(on, runs)
@@ -757,6 +777,34 @@ function sessionsOf(...rows: readonly (readonly [name: string, worktree: string,
       status,
     })),
   )
+}
+
+/**
+ * An agent of the session's own, as `$.agent.list()` has it.
+ */
+function ownAgent(status: 'running' | 'completed') {
+  return { id: 'abc', name: 'agent-abc', description: 'Fix the totals', type: 'general-purpose', status }
+}
+
+/**
+ * The recording with feat/landed's worktree locked by that agent, as Claude
+ * Code locks the worktree of an agent it isolates in one.
+ */
+function agentLocked(runs: Recorded): Recorded {
+  const key = JSON.stringify(['/work', 'worktree', 'list', '--porcelain'])
+  const list = runs[key]
+
+  if (list === undefined) {
+    throw new Error('the recording has no worktree list')
+  }
+
+  return {
+    ...runs,
+    [key]: {
+      ...list,
+      stdout: list.stdout.replace('branch refs/heads/feat/landed\n', 'branch refs/heads/feat/landed\nlocked claude agent agent-abc (pid 42 start 7)\n'),
+    },
+  }
 }
 
 /**
