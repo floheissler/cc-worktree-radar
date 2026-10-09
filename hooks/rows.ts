@@ -698,21 +698,14 @@ const FOOT_MESSAGE_MIN_CELLS = 10
 const MESSAGE_OUTRANKS = 3
 
 /**
- * What the foot hangs from under the table: a hook in the `#` column, so
- * the status line's text lines up with the branch names.
- */
-const FOOT_HOOK: Segment = { text: '╰'.padStart(RANK_CELLS - 1).padEnd(RANK_CELLS), dim: true }
-
-/**
- * The foot, a status line read left to right after its hook: the radar,
- * where it looks, what each lane holds, what lands next. Its right end is
- * for messages: a caller's line, then what to know (uncommitted files in
- * the main worktree, sessions unknown, a failed read). A narrow band gives
- * up the messages, then the long lane labels, the title, the place and the
+ * The foot, a status line read left to right: the radar, where it looks,
+ * what each lane holds, what lands next. Its right end is for messages: a
+ * caller's line, then what to know (uncommitted files in the main worktree,
+ * sessions unknown, a failed read). A narrow band gives up the messages,
+ * then the long lane labels, the title, the place and the
  * counts, before what lands next.
  */
 function footOf(model: BandModel, snapshot: Snapshot, columns: number): Line {
-  const cells = Math.max(columns - RANK_CELLS, 0)
   const layouts = statusLayoutsOf(model, snapshot, [])
   const messages = joined(messagesOf(model, snapshot).map(message => [message]))
   const messageCells = lineWidthOf({ key: '', segments: messages })
@@ -721,15 +714,17 @@ function footOf(model: BandModel, snapshot: Snapshot, columns: number): Line {
   // counts or what lands next: past those it is cut
   const roomy = layouts
     .slice(0, MESSAGE_OUTRANKS)
-    .find(layout => messageCells > 0 && widthOf(layout) + FOOT_GAP_CELLS + messageCells <= cells)
-  const left = roomy ?? firstFitting(layouts, cells)
+    .find(layout => messageCells > 0 && widthOf(layout) + FOOT_GAP_CELLS + messageCells <= columns)
+  const left = roomy ?? firstFitting(layouts, columns)
   const leftCells = widthOf(left)
-  const room = cells - leftCells - FOOT_GAP_CELLS
+  const room = columns - leftCells - FOOT_GAP_CELLS
   const shown = room >= FOOT_MESSAGE_MIN_CELLS ? fitSegments(messages, room) : []
   const shownCells = widthOf(shown)
-  const status = shownCells === 0 ? left : [...left, { text: ' '.repeat(cells - leftCells - shownCells) }, ...shown]
 
-  return { key: 'foot', segments: fitSegments([FOOT_HOOK, ...status], columns) }
+  return {
+    key: 'foot',
+    segments: shownCells === 0 ? left : [...left, { text: ' '.repeat(columns - leftCells - shownCells) }, ...shown],
+  }
 }
 
 /**
@@ -757,6 +752,15 @@ function messagesOf(model: BandModel, snapshot: Snapshot): Segment[] {
   }
 
   return messages
+}
+
+/**
+ * The rule between the table and the foot: dotted, dim and inside the
+ * padding, so it reads fainter than the frame and meets neither of its
+ * sides.
+ */
+function dividerOf(columns: number): Line {
+  return { key: 'divider', segments: [{ text: '┄'.repeat(Math.max(columns, 0)), dim: true }] }
 }
 
 function nameOf(path: string): string {
@@ -793,12 +797,9 @@ export function bandLinesOf(model: BandModel): Line[] {
     return [
       {
         key: 'empty',
-        // In the branch column, over the foot's text
-        segments: fitSegments(
-          [{ text: ' '.repeat(RANK_CELLS) }, { text: `no branches besides ${sanitize(snapshot.base.name)}`, dim: true }],
-          headerRoomOf(model, columns),
-        ),
+        segments: fitSegments([{ text: `no branches besides ${sanitize(snapshot.base.name)}`, dim: true }], headerRoomOf(model, columns)),
       },
+      dividerOf(columns),
       footOf(model, snapshot, columns),
     ]
   }
@@ -807,8 +808,8 @@ export function bandLinesOf(model: BandModel): Line[] {
 
   const nowSeconds = Math.floor(model.now / 1000)
   const folded = new Set<Lane>()
-  // The column names and the foot take a row each
-  const room = Math.max(model.maxRows - 2, 1)
+  // The column names, the divider and the foot take a row each
+  const room = Math.max(model.maxRows - 3, 1)
   const rowsWith = (): number =>
     snapshot.branches.filter(branch => !folded.has(branch.lane)).length +
     [...folded].filter(lane => snapshot.branches.some(branch => branch.lane === lane)).length
@@ -845,7 +846,7 @@ export function bandLinesOf(model: BandModel): Line[] {
     }
   }
 
-  lines.push(foot)
+  lines.push(dividerOf(columns), foot)
 
   return lines
 }

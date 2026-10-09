@@ -51,7 +51,7 @@ describe('the band laid out', () => {
   test('a header, a row per branch in lane order, and the next to land', async () => {
     const lines = bandLinesOf(modelOf(await fixtureSnapshot(), { columns: 140 }))
 
-    // The column names on top; under the rows, the status line on its hook
+    // The column names on top; under a divider, the status line
     expect(textOf(lines[0])).toMatch(/^ # BRANCH +LANE +AHEAD  AGE  NOTE$/)
     expect(lines.map(line => line.key)).toEqual([
       'columns',
@@ -66,6 +66,7 @@ describe('the band laid out', () => {
       'row:feat/clean',
       'row:feat/landed',
       'row:chore/merged',
+      'divider',
       'foot',
     ])
     expect(textOf(lines[1])).toMatch(/^ 1 feat\/parent\s+ready\s+\+1 +\d+[smhd]  feat\/child stacked on it$/)
@@ -76,10 +77,10 @@ describe('the band laid out', () => {
     expect(textOf(lines.find(line => line.key === 'row:feat/big'))).toMatch(/forces a rebase of #4 fix\/small$/)
     expect(textOf(lines.find(line => line.key === 'row:feat/conflict'))).toMatch(/rebase after feat\/conflict2$/)
     expect(textOf(lines.find(line => line.key === 'row:chore/merged'))).toMatch(/^ - chore\/merged\s+cleanup +nothing beyond main$/)
-    // The hook in the # column, the text in the branch column
-    expect(lines.at(-1)?.segments[0]).toEqual({ text: ' ╰ ', dim: true })
+    // A dotted, dim rule, fainter than the frame
+    expect(lines.at(-2)?.segments).toEqual([{ text: '┄'.repeat(140), dim: true }])
     expect(textOf(lines.at(-1))).toBe(
-      ' ╰ Worktree Radar · work [main] · 4 ready · 2 needs rebase · 1 stacked · 1 in progress · 1 on hold · 2 cleanup · land next → feat/parent',
+      'Worktree Radar · work [main] · 4 ready · 2 needs rebase · 1 stacked · 1 in progress · 1 on hold · 2 cleanup · land next → feat/parent',
     )
   })
 
@@ -170,6 +171,7 @@ describe('the band laid out', () => {
       'fold:IN_PROGRESS',
       'row:feat/clean',
       'fold:CLEANUP',
+      'divider',
       'foot',
     ])
     expect(textOf(lines[8])).toBe('   in progress (3): feat/wip, feat/w2, feat/w3')
@@ -188,19 +190,19 @@ describe('the band laid out', () => {
 
     // The status line on the left, the messages right-aligned at the end
     expect(textOf(foot)).toMatch(
-      /^ ╰ Worktree Radar · work \[main\] · .* · land next → feat\/parent +release v0\.4\.1 pending · main worktree: 2 uncommitted · sessions unknown · last read failed: index\.lock$/,
+      /^Worktree Radar · work \[main\] · .* · land next → feat\/parent +release v0\.4\.1 pending · main worktree: 2 uncommitted · sessions unknown · last read failed: index\.lock$/,
     )
     expect(lineWidthOf(foot as Line)).toBe(260)
 
     // Short of room, the messages go first; the status line keeps what lands next
-    const narrow = bandLinesOf(modelOf(dirty, { columns: 63, status: 'release v0.4.1 pending' })).at(-1)
+    const narrow = bandLinesOf(modelOf(dirty, { columns: 60, status: 'release v0.4.1 pending' })).at(-1)
 
-    expect(textOf(narrow)).toMatch(/^ ╰ land next → feat\/parent +release v0\.4\.1 pending · main wor…$/)
+    expect(textOf(narrow)).toMatch(/^land next → feat\/parent +release v0\.4\.1 pending · main wor…$/)
 
     // A message outranks the long labels and the title, not the place
-    const message = bandLinesOf(modelOf(snapshot, { columns: 134, status: 'release v0.4.1 pending' })).at(-1)
+    const message = bandLinesOf(modelOf(snapshot, { columns: 131, status: 'release v0.4.1 pending' })).at(-1)
 
-    expect(textOf(message)).toMatch(/^ ╰ work \[main\] · 4 ready · 2 rebase · .* · land next → feat\/parent +release v0\.4\.1 pending$/)
+    expect(textOf(message)).toMatch(/^work \[main\] · 4 ready · 2 rebase · .* · land next → feat\/parent +release v0\.4\.1 pending$/)
   })
 
   test('before the first read, and when there is nothing to read', async () => {
@@ -213,8 +215,9 @@ describe('the band laid out', () => {
     const empty = bandLinesOf(modelOf({ ...snapshot, branches: [], next: null }))
 
     expect(empty.map(textOf)).toEqual([
-      '   no branches besides main',
-      ' ╰ Worktree Radar · work [main] · nothing ready to land',
+      'no branches besides main',
+      '┄'.repeat(100),
+      'Worktree Radar · work [main] · nothing ready to land',
     ])
   })
 

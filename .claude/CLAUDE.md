@@ -122,17 +122,18 @@ the module otherwise:
   drops ahead and shortens the lane labels; narrow keeps `#`, branch and
   lane. A ready row's note says only what else there is (a stack on it, a
   rebase it forces): "merges cleanly" is what ready means. Its first row names the columns (`columnHeaderOf`), the
-  controls at its end. Under the rows, the foot is a status line hung from
-  a `╰` in the `#` column (`FOOT_HOOK`), its text in the branch column,
-  read left to right (`statusLayoutsOf`): the title, `repo [base]`, the
-  counts, `land next →`; messages (a caller's status, what to know)
-  right-aligned. A divider across the band above it was tried and dropped:
-  it did not look good.
+  controls at its end. Under a dotted dim rule (`dividerOf`, inside the
+  padding), the foot is a status line read left to right
+  (`statusLayoutsOf`): the title, `repo [base]`, the counts,
+  `land next →`; messages (a caller's status, what to know) right-aligned.
   Short of room it gives up, in order, the long lane labels, the title,
   the place and the counts; a message may push out the labels
   and the title (`MESSAGE_OUTRANKS`), never more. Compact, the band is that
   status line alone. `fitWhole` keeps whole pieces where a cut one would
-  read wrong.
+  read wrong. Other dividers were tried and dropped: a solid dim rule, the
+  rule in the frame's color reaching its sides (it split the panel in two,
+  without joints, as a mod cannot draw on the border) and a `╰` hook before
+  the status line, which read as a stray corner.
 - The frame's border is Claude Code's, drawn over anything a mod lays on it:
   checked live on 2.1.295, a title placed with `position: "absolute"` over
   the top edge did not show, and overlays reach the padding cells only. So
