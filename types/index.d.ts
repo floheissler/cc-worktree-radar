@@ -215,6 +215,11 @@ declare module 'claude-code' {
        */
       status: string | null
       /**
+       * Whether the help (what the lanes and notes mean) stands in for the
+       * queue.
+       */
+      helpShown: boolean
+      /**
        * Branches found due a rebase, by name, at the tip they were due on:
        * while one is in progress afterwards, it is being rebased, and the
        * branches it conflicts with wait for it.

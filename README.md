@@ -38,12 +38,16 @@ Answer `y` to add the marketplace, then pick a scope.
 |---|---|
 | `/radar` | Opens the radar on the session's repository, or closes it |
 | `/radar <base>` | Opens it with another base branch than the detected one (`origin/HEAD`, else `main`, else `master`) |
+| `/radar help` | Opens it on its help: what each lane and note means |
 | `/radar hold <branch> [reason]` | Parks a branch: it stays out of the READY lane |
 | `/radar unhold <branch>` | Lets it go again |
 | `/radar off` | Closes the radar |
 
-The band collapses with its `[-]` mark (or Ctrl+X Ctrl+A) and closes with
-`×`. It updates by itself while open: every few seconds the radar checks the
+The band is framed like a panel. `h: help` in its header switches between
+the queue and a help that explains every lane, note and control; `×` closes
+the radar. Click them, or give the band the keyboard (Ctrl+X Tab) and press
+`h`. The `[-]` beside the band is Claude Code's own: it folds the band away
+(Ctrl+X Ctrl+A), and a mod cannot move it into the frame. It updates by itself while open: every few seconds the radar checks the
 branch tips, the worktrees and the running Claude sessions, and reads the
 repository again once a change has settled.
 

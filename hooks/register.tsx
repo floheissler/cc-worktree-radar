@@ -8,7 +8,7 @@ import type { Host, RadarOptions } from './host'
 import Limits from './limits'
 import { BAND_TITLE, COMMAND_DESCRIPTION, COMMAND_HINT } from './names'
 import { createRadar, type Radar } from './radar'
-import { bandLinesOf } from './rows'
+import { bandLinesOf, frameOf } from './rows'
 import { clipChars, messageOf, sanitize } from './text'
 import { TOOL_DESCRIPTION, TOOL_INPUT_SCHEMA, toolJsonOf, toolRequestOf } from './tool'
 import { bandView } from './view'
@@ -22,6 +22,7 @@ const SNAPSHOT = atom({ plugin: 'worktree-radar', key: 'snapshot' } as const, nu
 const PROBLEM = atom({ plugin: 'worktree-radar', key: 'problem' } as const, null)
 const NOTES = atom({ plugin: 'worktree-radar', key: 'notes' } as const, {})
 const STATUS = atom({ plugin: 'worktree-radar', key: 'status' } as const, null)
+const HELP_SHOWN = atom({ plugin: 'worktree-radar', key: 'helpShown' } as const, false)
 const DUE_MARKS = atom({ plugin: 'worktree-radar', key: 'dueMarks' } as const, {})
 
 /**
@@ -99,6 +100,12 @@ function hostOf($: EngineInterface, options: RadarOptions): Host {
           await update($, STATUS, fn)
         },
       },
+      helpShown: {
+        get: () => read($, HELP_SHOWN),
+        set: async fn => {
+          await update($, HELP_SHOWN, fn)
+        },
+      },
       dueMarks: {
         get: () => read($, DUE_MARKS),
         set: async fn => {
@@ -133,6 +140,7 @@ async function closeRadar(host: Host, radar: Radar): Promise<void> {
   await host.state.snapshot.set(() => null)
   await host.state.problem.set(() => null)
   await host.state.status.set(() => null)
+  await host.state.helpShown.set(() => false)
 }
 
 /**
@@ -214,6 +222,14 @@ export const register: Register = (on, pluginOptions) => {
         return {}
       case 'close':
         await closeRadar(host, radar)
+
+        return {}
+      case 'help':
+        await host.state.helpShown.set(() => true)
+
+        if (open === null) {
+          void openRadar(host, radar, { root, base: null, wake: [] }).catch(() => undefined)
+        }
 
         return {}
       case 'hold':
@@ -311,17 +327,33 @@ export const register: Register = (on, pluginOptions) => {
       return next(e)
     }
 
-    const [snapshot, problem, status, now] = await Promise.all([
+    const [snapshot, problem, status, isHelpShown, now] = await Promise.all([
       host.state.snapshot.get(),
       host.state.problem.get(),
       host.state.status.get(),
+      host.state.helpShown.get(),
       host.now(),
     ])
     const columns = e.props.bodyColumns
-    const lines = bandLinesOf({ snapshot, problem, status, root: open.root, now, columns, maxRows: e.props.maxRows })
+    const frame = frameOf(columns, e.props.maxRows)
+    const lines = bandLinesOf({
+      snapshot,
+      problem,
+      status,
+      root: open.root,
+      now,
+      columns: frame.columns,
+      maxRows: frame.maxRows,
+      isHelpShown,
+    })
 
-    return bandView($.ui.resolve(e), lines, columns, () => {
-      void closeRadar(hostOf($, options), radar)
+    return bandView($.ui.resolve(e), lines, columns, frame, isHelpShown, {
+      toggleHelp: () => {
+        void hostOf($, options).state.helpShown.set(shown => !shown)
+      },
+      close: () => {
+        void closeRadar(hostOf($, options), radar)
+      },
     })
   })
 }

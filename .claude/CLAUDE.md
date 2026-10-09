@@ -112,7 +112,17 @@ the module otherwise:
   the laid MCP types do not list a plugin's own tool, so a literal fails
   `tsc`.
 - Lanes are colored with theme keys (`LANE_COLORS`), and every line is
-  fitted to `bodyColumns` in cells; `rows.test.ts` sweeps 1–160 columns.
+  fitted to `bodyColumns` in cells; `rows.test.ts` sweeps 1–160 columns,
+  the queue and the help alike.
+- The band is framed (`frameOf`: a rounded border in `promptBorder` and a
+  cell of padding, 4 cells and 2 rows) from `FRAME_MIN_COLUMNS` on; the
+  lines are laid out for the room inside it. The `[-]` beside the band is
+  the engine's, in the five cells `bodyColumns` leaves out: a mod can
+  neither move it into the frame nor hide it.
+- The header ends in two controls (`CONTROLS_CELLS`): `h: help`/`h: back`
+  (`helpShown`, `$.state`) and `×`. A hotkey works only while the band has
+  the keyboard (Ctrl+X Tab, a click); no digit hotkeys, as a bare digit in
+  an empty prompt presses a band Button.
 
 ## Carried over from cc-file-explorer
 

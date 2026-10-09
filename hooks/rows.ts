@@ -49,6 +49,10 @@ export type BandModel = {
    * The rows the band shows whole; past them it scrolls.
    */
   readonly maxRows: number
+  /**
+   * Whether the help stands in for the queue.
+   */
+  readonly isHelpShown: boolean
 }
 
 export const LANE_LABELS: Readonly<Record<Lane, string>> = {
@@ -70,6 +74,18 @@ export const SHORT_LANE_LABELS: Readonly<Record<Lane, string>> = {
   IN_PROGRESS: 'wip',
   HOLD: 'hold',
   CLEANUP: 'done',
+}
+
+/**
+ * What each lane means, for the help; `{base}` stands for the base branch.
+ */
+export const LANE_MEANINGS: Readonly<Record<Lane, string>> = {
+  READY: 'merges cleanly into {base}, nothing uncommitted, no busy session in its worktree',
+  NEEDS_REBASE: 'conflicts with {base}: it needs a rebase before it can land',
+  STACKED: 'holds every commit of another open branch: that one lands first',
+  IN_PROGRESS: 'uncommitted changes, a rebase under way, or a busy Claude session in its worktree',
+  HOLD: 'parked with /radar hold, out of the ready lane until it is let go',
+  CLEANUP: 'nothing left to land: landed in {base}, or no commits and no session',
 }
 
 /**
@@ -98,9 +114,51 @@ export const WIDE_COLUMNS = 64
 export const MEDIUM_COLUMNS = 40
 
 /**
- * Cells left for the band's close mark at the header's end.
+ * Cells left at the header's end for its controls: a gap, the help toggle
+ * (`h: help`), a gap and the close mark.
  */
-export const CLOSE_CELLS = 2
+export const CONTROLS_CELLS = 10
+
+/**
+ * What the frame around the band takes: a border and a cell of padding on
+ * each side, a border row above and below.
+ */
+export const FRAME_CELLS = 4
+export const FRAME_ROWS = 2
+
+/**
+ * Below this width the band drops its frame, so the rows keep the cells.
+ */
+export const FRAME_MIN_COLUMNS = 24
+
+/**
+ * The room the band's lines get inside its frame.
+ */
+export type Frame = {
+  readonly isFramed: boolean
+  /**
+   * The cells each line may take.
+   */
+  readonly columns: number
+  /**
+   * The rows the lines show whole.
+   */
+  readonly maxRows: number
+}
+
+/**
+ * Fits the frame to the band: framed from `FRAME_MIN_COLUMNS` on, the lines
+ * laid out inside the border and its padding.
+ *
+ * @param columns the cells the band's tree is laid out in (`bodyColumns`)
+ * @param maxRows the rows the band shows whole
+ * @returns the frame and the room inside it
+ */
+export function frameOf(columns: number, maxRows: number): Frame {
+  return columns >= FRAME_MIN_COLUMNS
+    ? { isFramed: true, columns: columns - FRAME_CELLS, maxRows: Math.max(maxRows - FRAME_ROWS, 1) }
+    : { isFramed: false, columns, maxRows }
+}
 
 /**
  * An age as people read it: `42s`, `5m`, `3h`, `2d`.
@@ -309,11 +367,16 @@ function foldedLineOf(lane: Lane, branches: readonly BranchInfo[], columns: numb
 }
 
 /**
- * The header: the radar, the repository, the base and what each lane holds.
+ * The header: the radar, the repository, the base and what each lane holds;
+ * under the help, the radar and the word help.
  */
 function headerOf(model: BandModel, snapshot: Snapshot | null, columns: number): Line {
   const repo = sanitize(nameOf(snapshot?.repo ?? model.root))
   const segments: Segment[] = [{ text: BAND_TITLE, bold: true }, { text: ` · ${repo}`, dim: true }]
+
+  if (model.isHelpShown) {
+    return { key: 'header', segments: fitSegments([...segments, { text: ' · help', dim: true }], columns - CONTROLS_CELLS) }
+  }
 
   if (snapshot !== null) {
     segments.push({ text: ` → ${sanitize(snapshot.base.name)}`, dim: true })
@@ -327,7 +390,7 @@ function headerOf(model: BandModel, snapshot: Snapshot | null, columns: number):
     }
   }
 
-  return { key: 'header', segments: fitSegments(segments, columns - CLOSE_CELLS) }
+  return { key: 'header', segments: fitSegments(segments, columns - CONTROLS_CELLS) }
 }
 
 /**
@@ -376,6 +439,10 @@ export function bandLinesOf(model: BandModel): Line[] {
   const columns = Math.max(model.columns, 1)
   const { snapshot } = model
 
+  if (model.isHelpShown) {
+    return [headerOf(model, snapshot, columns), ...helpLinesOf(snapshot?.base.name ?? 'the base', columns)]
+  }
+
   if (snapshot === null) {
     const header = headerOf(model, null, columns)
     const text = model.problem === null ? 'reading…' : sanitize(model.problem)
@@ -385,7 +452,7 @@ export function bandLinesOf(model: BandModel): Line[] {
         key: 'header',
         segments: fitSegments(
           [...header.segments, { text: ' · ', dim: true }, { text, ...(model.problem === null ? { dim: true } : { color: 'error' as const }) }],
-          columns - CLOSE_CELLS,
+          columns - CONTROLS_CELLS,
         ),
       },
     ]
@@ -439,6 +506,129 @@ export function bandLinesOf(model: BandModel): Line[] {
   }
 
   lines.push(foot)
+
+  return lines
+}
+
+/**
+ * Breaks text into lines of at most `cells` cells at its spaces; a word
+ * longer than a line is cut.
+ *
+ * @param text one paragraph, sanitized
+ * @param cells the cells a line may take
+ * @returns the lines
+ */
+export function wrapWords(text: string, cells: number): string[] {
+  const lines: string[] = []
+  let line = ''
+
+  for (const word of text.split(' ').filter(part => part !== '')) {
+    const next = line === '' ? word : `${line} ${word}`
+
+    if (cellWidth(next) <= cells) {
+      line = next
+
+      continue
+    }
+
+    if (line !== '') {
+      lines.push(line)
+    }
+
+    line = cellWidth(word) <= cells ? word : truncateEnd(word, cells)
+  }
+
+  return line === '' ? lines : [...lines, line]
+}
+
+/**
+ * One entry of the help: a term in its own style, what it means beside it.
+ */
+type HelpEntry = {
+  readonly term: Segment
+  readonly meaning: string
+}
+
+/**
+ * Cells the help's term column takes, its gap included.
+ */
+const TERM_CELLS = 24
+
+/**
+ * Below this width a meaning goes under its term, not beside it.
+ */
+const SIDE_BY_SIDE_COLUMNS = TERM_CELLS + 20
+
+/**
+ * What the lanes, the notes and the controls mean, laid out to the band.
+ *
+ * @param base the base branch's name
+ * @param columns the cells each line may take
+ * @returns the help's lines, under the header
+ */
+export function helpLinesOf(base: string, columns: number): Line[] {
+  const onto = sanitize(base)
+  const sections: readonly { readonly title: string; readonly entries: readonly HelpEntry[] }[] = [
+    {
+      title: 'Lanes',
+      entries: (Object.keys(LANE_LABELS) as Lane[]).map(lane => ({
+        term: { text: LANE_LABELS[lane], color: LANE_COLORS[lane] },
+        meaning: LANE_MEANINGS[lane].replaceAll('{base}', onto),
+      })),
+    },
+    {
+      title: 'On a row',
+      entries: [
+        { term: { text: '1 2 3' , bold: true }, meaning: `the order to land the ready branches in: stack parents first, then whichever forces the least rebase work on the others, then whichever finished first` },
+        { term: { text: '+3' }, meaning: `commits the branch has that ${onto} lacks` },
+        { term: { text: 'rebase due', color: 'error' }, meaning: 'rebase it now: nothing that lands before it still conflicts with it' },
+        { term: { text: 'rebase after X' }, meaning: 'X lands first and conflicts with it too; a rebase now would have to be done again' },
+        { term: { text: 'forces a rebase of X' }, meaning: 'landing this branch makes X conflict' },
+        { term: { text: 'X stacked on it' }, meaning: 'X holds this branch: this one lands first' },
+        { term: { text: `landed in ${onto}` }, meaning: `its work reached ${onto} through a merge` },
+        { term: { text: '5m' }, meaning: 'since its last commit' },
+      ],
+    },
+    {
+      title: 'Controls',
+      entries: [
+        { term: { text: 'h' }, meaning: 'this help, and back; the band takes keys after ctrl+x tab or a click' },
+        { term: { text: '×' }, meaning: 'closes the radar, as /radar does' },
+        { term: { text: '[-]' }, meaning: "Claude Code's own: folds the band away (ctrl+x ctrl+a)" },
+        { term: { text: '/radar hold <branch>' }, meaning: 'parks a branch; /radar unhold <branch> lets it go' },
+      ],
+    },
+  ]
+  const isSideBySide = columns >= SIDE_BY_SIDE_COLUMNS
+  const lines: Line[] = []
+
+  for (const section of sections) {
+    lines.push({ key: `help:${section.title}`, segments: fitSegments([{ text: section.title, bold: true }], columns) })
+
+    for (const entry of section.entries) {
+      const key = `help:${section.title}:${entry.term.text}`
+      const term = { ...entry.term, text: truncateEnd(entry.term.text, Math.max(columns - 2, 1)) }
+
+      if (isSideBySide) {
+        wrapWords(entry.meaning, columns - TERM_CELLS).forEach((text, at) => {
+          lines.push({
+            key: `${key}:${at}`,
+            segments: fitSegments(
+              [at === 0 ? { ...term, text: padEnd(`  ${term.text}`, TERM_CELLS) } : { text: ' '.repeat(TERM_CELLS) }, { text, dim: true }],
+              columns,
+            ),
+          })
+        })
+
+        continue
+      }
+
+      lines.push({ key, segments: fitSegments([{ text: '  ' }, term], columns) })
+      wrapWords(entry.meaning, Math.max(columns - 4, 1)).forEach((text, at) => {
+        lines.push({ key: `${key}:${at}`, segments: fitSegments([{ text: '    ' }, { text, dim: true }], columns) })
+      })
+    }
+  }
 
   return lines
 }

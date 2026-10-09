@@ -22,6 +22,7 @@ export type RadarState = {
   readonly problem: StateCell<string | null>
   readonly notes: StateCell<Record<string, CallerNote>>
   readonly status: StateCell<string | null>
+  readonly helpShown: StateCell<boolean>
   readonly dueMarks: StateCell<Record<string, string>>
 }
 

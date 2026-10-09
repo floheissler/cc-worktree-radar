@@ -112,6 +112,68 @@ describe('/radar', () => {
     expect(await bandText($)).toEqual([])
   })
 
+  test('frames the band like a panel, and drops the frame when narrow', async ($, on) => {
+    const { clock } = worldOf(on)
+
+    await $.command.run(RADAR)
+    await settled(clock)
+
+    for (const surface of ['terminal', 'desktop'] as const) {
+      const wide = await $.ui.mount({ ...BAND, surface })
+
+      expect(await wide.drawn()).toMatchObject({
+        type: 'Box',
+        props: { borderStyle: 'round', borderColor: 'promptBorder', paddingX: 1, width: 135 },
+      })
+      await wide.unmount()
+
+      const narrow = await $.ui.mount({ ...BAND, surface, props: { ...BAND.props, bodyColumns: 20 } })
+      const drawn = await narrow.drawn()
+
+      expect((drawn as { props: Record<string, unknown> }).props.borderStyle).toBeUndefined()
+      expect(await narrow.find({ type: 'Text', text: /^Worktree/ })).toBeDefined()
+      await narrow.unmount()
+    }
+  })
+
+  test('h shows the help and goes back; /radar help opens on it', async ($, on) => {
+    const { clock } = worldOf(on)
+
+    await $.command.run(RADAR)
+    await settled(clock)
+
+    for (const surface of ['terminal', 'desktop'] as const) {
+      const ui = await $.ui.mount({ ...BAND, surface })
+
+      expect(await ui.find({ key: 'help' })).toMatchObject({ props: { hotkey: 'h', label: 'help' } })
+      await ui.press({ key: 'help' })
+      await settled(clock)
+      await ui.unmount()
+
+      const help = await bandText($, surface)
+
+      expect(help).toContain('Lanes')
+      expect(help.some(text => /^ {2}needs rebase +conflicts with main/.test(text))).toBe(true)
+      expect(help.some(text => /feat\/parent/.test(text))).toBe(false)
+
+      const back = await $.ui.mount({ ...BAND, surface })
+
+      expect(await back.find({ key: 'help' })).toMatchObject({ props: { label: 'back' } })
+      await back.press({ key: 'help' })
+      await settled(clock)
+      await back.unmount()
+
+      expect((await bandText($, surface)).some(text => /^ 1 feat\/parent\s+ready/.test(text))).toBe(true)
+    }
+
+    await $.command.run(RADAR)
+    await settled(clock)
+    await $.command.run({ ...RADAR, args: 'help' })
+    await settled(clock)
+
+    expect(await bandText($)).toContain('Lanes')
+  })
+
   test('the close mark closes it', async ($, on) => {
     const { clock } = worldOf(on)
 

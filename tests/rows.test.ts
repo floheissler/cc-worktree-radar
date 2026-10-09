@@ -4,7 +4,18 @@ import type { Snapshot } from '../types'
 
 import { readSnapshot } from '../hooks/analysis'
 import { gitOf } from '../hooks/git'
-import { ageOf, bandLinesOf, CLOSE_CELLS, lineWidthOf, type BandModel, type Line } from '../hooks/rows'
+import {
+  ageOf,
+  bandLinesOf,
+  CONTROLS_CELLS,
+  FRAME_MIN_COLUMNS,
+  frameOf,
+  lineWidthOf,
+  wrapWords,
+  type BandModel,
+  type Line,
+} from '../hooks/rows'
+import { cellWidth } from '../hooks/text'
 import { HOLDS } from './fixtures/repo'
 import { replayOf } from './replay'
 
@@ -30,7 +41,7 @@ async function fixtureSnapshot(): Promise<Snapshot> {
 }
 
 function modelOf(snapshot: Snapshot | null, changes: Partial<BandModel> = {}): BandModel {
-  return { snapshot, problem: null, status: null, root: '/work', now: NOW, columns: 100, maxRows: 40, ...changes }
+  return { snapshot, problem: null, status: null, root: '/work', now: NOW, columns: 100, maxRows: 40, isHelpShown: false, ...changes }
 }
 
 const textOf = (line: Line | undefined): string => line?.segments.map(segment => segment.text).join('') ?? ''
@@ -79,7 +90,7 @@ describe('the band laid out', () => {
 
     for (let columns = 1; columns <= 160; columns += 1) {
       for (const line of bandLinesOf(modelOf(snapshot, { columns, status: 'release v0.4.1 pending', problem: 'boom' }))) {
-        const room = line.key === 'header' ? columns - CLOSE_CELLS : columns
+        const room = line.key === 'header' ? columns - CONTROLS_CELLS : columns
 
         expect(lineWidthOf(line), `${line.key} at ${columns}`).toBeLessThanOrEqual(Math.max(room, 0))
       }
@@ -164,6 +175,43 @@ describe('the band laid out', () => {
 
     expect(row).toContain('feat/␛[31mred')
     expect(row).toContain('a␊b')
+  })
+
+  test('the frame takes four cells and two rows, and goes on a narrow band', () => {
+    expect(frameOf(135, 30)).toEqual({ isFramed: true, columns: 131, maxRows: 28 })
+    expect(frameOf(FRAME_MIN_COLUMNS, 2)).toEqual({ isFramed: true, columns: FRAME_MIN_COLUMNS - 4, maxRows: 1 })
+    expect(frameOf(FRAME_MIN_COLUMNS - 1, 30)).toEqual({ isFramed: false, columns: FRAME_MIN_COLUMNS - 1, maxRows: 30 })
+  })
+
+  test('the help explains every lane in its color, and fits every width', async () => {
+    const snapshot = await fixtureSnapshot()
+    const lines = bandLinesOf(modelOf(snapshot, { isHelpShown: true, columns: 100 }))
+
+    expect(textOf(lines[0])).toBe('Worktree Radar · work · help')
+    expect(textOf(lines[1])).toBe('Lanes')
+    expect(lines[2]?.segments[0]).toMatchObject({ text: expect.stringMatching(/^ {2}ready +$/), color: 'success' })
+    expect(textOf(lines[2])).toMatch(/^ {2}ready +merges cleanly into main, nothing uncommitted/)
+    expect(lines.some(line => line.segments.some(segment => segment.text.trim() === 'needs rebase' && segment.color === 'error'))).toBe(true)
+    expect(lines.map(textOf).some(text => text.includes("Claude Code's own: folds the band away"))).toBe(true)
+
+    for (let columns = 1; columns <= 160; columns += 1) {
+      for (const line of bandLinesOf(modelOf(snapshot, { columns, isHelpShown: true }))) {
+        const room = line.key === 'header' ? columns - CONTROLS_CELLS : columns
+
+        expect(lineWidthOf(line), `${line.key} at ${columns}`).toBeLessThanOrEqual(Math.max(room, 0))
+      }
+    }
+
+    // Narrow, a meaning goes under its term
+    const narrow = bandLinesOf(modelOf(snapshot, { columns: 30, isHelpShown: true }))
+
+    expect(narrow.slice(2, 4).map(textOf)).toEqual(['  ready', '    merges cleanly into main,'])
+  })
+
+  test('wraps words to a width, cutting only a word longer than a line', () => {
+    expect(wrapWords('one two three four', 9)).toEqual(['one two', 'three', 'four'])
+    expect(wrapWords('abcdefghijkl x', 5).every(line => cellWidth(line) <= 5)).toBe(true)
+    expect(wrapWords('', 5)).toEqual([])
   })
 
   test('ages read in their largest unit', () => {

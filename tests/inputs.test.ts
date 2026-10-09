@@ -7,6 +7,7 @@ describe('/radar arguments', () => {
   test('toggle, close, a base, hold and unhold', () => {
     expect(commandRequestOf('')).toEqual({ kind: 'toggle' })
     expect(commandRequestOf('  off ')).toEqual({ kind: 'close' })
+    expect(commandRequestOf('help')).toEqual({ kind: 'help' })
     expect(commandRequestOf('develop')).toEqual({ kind: 'open', base: 'develop' })
     expect(commandRequestOf('hold feat/x waiting for the API')).toEqual({
       kind: 'hold',
