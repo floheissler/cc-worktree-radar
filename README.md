@@ -7,14 +7,14 @@ which are stacked on another, which a Claude session is still working on,
 and the order to land them in.
 
 ```
-╭────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-│  # BRANCH         LANE          AHEAD  AGE  NOTE                                        h: help c: compact x: exit │
-│  1 feat/checkout  ready            +4  12m                                                                         │
-│  2 fix/totals     ready            +1   3m  forces a rebase of feat/coupons                                        │
-│  - feat/coupons   needs rebase     +6  20m  conflicts: cart.ts · rebase after fix/totals                           │
-│  - feat/search    in progress      +2   1m  search-worker busy                                                     │
-│ next → feat/checkout             Worktree Radar · shop → main · 2 ready · 1 needs rebase · 1 in progress           │
-╰────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+╭────────────────────────────────────────────────────────────────────────────────────────────────╮
+│  # BRANCH         LANE        AHEAD  AGE  NOTE                      h: help c: compact x: exit │
+│  1 feat/checkout  ready          +4  12m                                                       │
+│  2 fix/totals     ready          +1   3m  forces a rebase of feat/coupons                      │
+│  - feat/coupons   needs rebase   +6  20m  conflicts: cart.ts · rebase after fix/totals         │
+│  - feat/search    in progress    +2   1m  search-worker busy                                   │
+│ next → feat/checkout   Worktree Radar · shop → main · 2 ready · 1 needs rebase · 1 in progress │
+╰────────────────────────────────────────────────────────────────────────────────────────────────╯
 ```
 
 It only looks. It never merges, rebases, tags, pushes or moves a ref.
