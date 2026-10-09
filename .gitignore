@@ -6,3 +6,6 @@ ROADMAP.md
 
 # Worktrees made with claude -w
 .claude/worktrees/
+
+# Local investigation notes and evidence, not part of the plugin
+research/
