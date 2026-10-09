@@ -64,7 +64,7 @@ The band is framed like a panel, with three controls in its header:
 | Control | Does |
 |---|---|
 | `h: help` | switches between the queue and a help that explains every lane, detail, comment and control |
-| `c: compact` | folds the radar into one line: what lands next, then the counts; `c: expand` brings the queue back |
+| `c: compact` | folds the radar into its status line: the counts, then what lands next; `c: expand` brings the queue back |
 | `x: exit` | closes the radar, as `/radar` does |
 
 Under the panel, the status line reads left to right: the title, the
@@ -73,7 +73,8 @@ lands next. Its right end holds messages: a skill's status line, uncommitted
 files in the main worktree, a failed read. On a narrow band the messages go
 first, then the long lane labels (`2 rebase`, `1 wip`), the title, the
 repository and the counts; `land next` stays to the end. Compact, the
-panel goes and the status line stays, alone above the prompt.
+panel goes and the status line stays alone above the prompt, the controls
+at its end where the messages were; only a failed read still shows.
 
 Click the controls, or give the band the keyboard (Ctrl+X Tab, or a click) and press
 the letter. On a band narrower than 90 columns the labels shorten to

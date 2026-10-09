@@ -1070,7 +1070,7 @@ export function helpLinesOf(base: string, columns: number): Line[] {
       title: 'Controls',
       entries: [
         { term: { text: 'h' }, meaning: 'this help, and back; the band takes keys after ctrl+x tab or a click' },
-        { term: { text: 'c' }, meaning: 'folds the radar into one line: what lands next, then the counts' },
+        { term: { text: 'c' }, meaning: 'folds the radar into its status line: the counts, then what lands next' },
         { term: { text: 'x' }, meaning: 'exits the radar, as /radar does' },
         {
           term: { text: '/radar hold <branch>' },

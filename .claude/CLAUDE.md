@@ -233,9 +233,10 @@ the module otherwise:
   what to know) right-aligned. Short of room it gives up, in order, the long
   lane labels, the title, the place and the counts; a message may push out
   the labels and the title (`MESSAGE_OUTRANKS`), never more. Compact, the
-  frame goes and the band is that status line alone, an empty row above it
-  so it stands apart from Claude Code's spinner and tips as the frame's top
-  edge does. `fitWhole` keeps whole
+  frame goes and the band is that status line alone (`headerOf`, the same
+  `statusLayoutsOf`), the controls at its end where the messages were, a
+  failed read the one message kept; an empty row above it so it stands
+  apart from Claude Code's spinner and tips as the frame's top edge does. `fitWhole` keeps whole
   pieces where a cut one would read wrong. Dividers inside the frame were
   tried and dropped for the frame itself: a solid dim rule, a dotted dim
   rule, the rule in the frame's color reaching its sides (it split the panel
@@ -259,8 +260,9 @@ the module otherwise:
 - The header ends in three controls (`controlsOf`, their width
   `controlsCellsOf`): `h: help`/`back` (`helpShown`), `c: compact`/`expand`
   (`compact`, both `$.state`) and `x: exit`; below `SHORT_CONTROLS_BELOW`
-  their labels shorten to one character. Compact, the band is the header
-  alone, `next →` first so a narrow band cuts the counts, not it. A hotkey
+  their labels shorten to one character. Compact, the band is its header
+  alone: the status line, which gives up the title, the place and the
+  counts before `land next →`, as the foot does. A hotkey
   works only while the band has the keyboard (Ctrl+X Tab, a click); no digit
   hotkeys, as a bare digit in an empty prompt presses a band Button.
 
