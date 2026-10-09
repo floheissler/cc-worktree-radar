@@ -106,9 +106,11 @@ The ranking: stack parents first, then the landing that forces the least
 rebase work on the other branches (in a conflicting pair the bigger one lands
 and the smaller one rebases), then the branch that finished first.
 
-Two blind spots: branches that merge cleanly can still break each other
-(only tests after each landing catch that), and an idle session is not
-necessarily done.
+Blind spots: branches that merge cleanly can still break each other (only
+tests after each landing catch that), and an idle session is not
+necessarily done. A branch landed by a squash merge still shows its commits
+as left to land: the base holds a rewritten copy of them, not the commits
+themselves.
 
 ## Driving it from a skill
 
