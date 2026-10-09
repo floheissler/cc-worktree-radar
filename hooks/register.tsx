@@ -8,7 +8,7 @@ import type { Host, RadarOptions } from './host'
 import Limits from './limits'
 import { BAND_TITLE, COMMAND_DESCRIPTION, COMMAND_HINT } from './names'
 import { createRadar, type Radar } from './radar'
-import { bandLinesOf, controlsOf, frameOf } from './rows'
+import { bandLinesOf, controlsOf, frameOf, sweepOf } from './rows'
 import { clipChars, messageOf, sanitize } from './text'
 import { TOOL_DESCRIPTION, TOOL_INPUT_SCHEMA, toolJsonOf, toolRequestOf } from './tool'
 import { bandView } from './view'
@@ -344,6 +344,7 @@ export const register: Register = (on, pluginOptions) => {
     ])
     const columns = e.props.bodyColumns
     const frame = frameOf(columns, e.props.maxRows)
+    const sweep = sweepOf(now, options.pollMs)
     const lines = bandLinesOf({
       snapshot,
       problem,
@@ -354,6 +355,7 @@ export const register: Register = (on, pluginOptions) => {
       maxRows: frame.maxRows,
       isHelpShown,
       isCompact,
+      sweep,
     })
     const controls = controlsOf(frame.columns, isHelpShown, isCompact)
 

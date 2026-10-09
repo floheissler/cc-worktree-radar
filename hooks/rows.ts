@@ -57,6 +57,35 @@ export type BandModel = {
    * Whether the queue is folded into the header's one line.
    */
   readonly isCompact: boolean
+  /**
+   * The sweep's glyph this drawing (`sweepOf`).
+   */
+  readonly sweep: string
+}
+
+/**
+ * The radar's sweep: one step per check, so a turning glyph says the radar
+ * is alive, and a still one that it stalled.
+ */
+export const SWEEP_FRAMES = ['◜', '◝', '◞', '◟'] as const
+
+/**
+ * The sweep's glyph at a time: the step of the check it falls in.
+ *
+ * @param now milliseconds since the epoch
+ * @param pollMs between two checks
+ * @returns the glyph
+ */
+export function sweepOf(now: number, pollMs: number): string {
+  return SWEEP_FRAMES[Math.floor(now / Math.max(pollMs, 1)) % SWEEP_FRAMES.length] as string
+}
+
+/**
+ * The band's title: the sweep and the name, leading the status line (the
+ * foot, or the compact line).
+ */
+export function titleOf(sweep: string): Segment[] {
+  return [{ text: `${sweep} `, color: 'suggestion' }, { text: BAND_TITLE, bold: true }]
 }
 
 export const LANE_LABELS: Readonly<Record<Lane, string>> = {
@@ -527,43 +556,73 @@ function foldedLineOf(lane: Lane, branches: readonly BranchInfo[], columns: numb
 }
 
 /**
- * The header: the radar, the repository, the base and what each lane holds;
- * under the help, the radar and the word help.
+ * Where the radar looks: the repository and the base everything lands on.
+ */
+function placeOf(model: BandModel, snapshot: Snapshot): Segment[] {
+  return [
+    { text: sanitize(nameOf(snapshot.repo || model.root)) },
+    { text: ` [${sanitize(snapshot.base.name)}]`, dim: true },
+  ]
+}
+
+/**
+ * What lands next: the branch ranked #1, or that nothing is ready.
+ */
+function nextOf(snapshot: Snapshot): Segment[] {
+  return snapshot.next === null
+    ? [{ text: 'nothing ready to land', dim: true }]
+    : [{ text: 'land next → ', dim: true }, { text: sanitize(snapshot.next), color: 'success', bold: true }]
+}
+
+/**
+ * Joins groups of runs with a dim ` · `, leaving out empty ones.
+ */
+function joined(groups: readonly (readonly Segment[])[]): Segment[] {
+  return groups
+    .filter(group => group.length > 0)
+    .flatMap((group, at) => (at === 0 ? [...group] : [{ text: ' · ', dim: true }, ...group]))
+}
+
+/**
+ * The first of several layouts that fits whole, else the last cut to fit:
+ * a line that gives up its least needed parts first.
+ */
+function firstFitting(layouts: readonly (readonly Segment[])[], cells: number): Segment[] {
+  const fitting = layouts.find(layout => lineWidthOf({ key: '', segments: layout }) <= cells)
+
+  return fitting === undefined ? fitSegments(layouts[layouts.length - 1] ?? [], cells) : [...fitting]
+}
+
+/**
+ * The top line when there is no queue to show: the help's heading, the
+ * read under way, or why there is none; compact, the whole band in a line.
  */
 function headerOf(model: BandModel, snapshot: Snapshot | null, columns: number): Line {
-  const repo = sanitize(nameOf(snapshot?.repo ?? model.root))
-  const segments: Segment[] = [{ text: BAND_TITLE, bold: true }, { text: ` · ${repo}`, dim: true }]
+  const room = headerRoomOf(model, columns)
 
   if (model.isHelpShown) {
-    return { key: 'header', segments: fitSegments([...segments, { text: ' · help', dim: true }], headerRoomOf(model, columns)) }
+    return { key: 'header', segments: fitSegments([{ text: 'Help', bold: true }, { text: ' · what each part of the band means', dim: true }], room) }
   }
 
   if (snapshot === null) {
-    return { key: 'header', segments: fitSegments(segments, headerRoomOf(model, columns)) }
+    const repo = sanitize(nameOf(model.root))
+
+    return {
+      key: 'header',
+      segments: fitSegments(
+        joined([
+          titleOf(model.sweep),
+          model.problem === null ? [{ text: `reading ${repo}…`, dim: true }] : [{ text: sanitize(model.problem), color: 'error' }],
+        ]),
+        room,
+      ),
+    }
   }
 
-  const counts = countsOf(snapshot)
-  const then: Segment[] = counts.length === 0 ? [] : [{ text: ' · ', dim: true }, ...counts]
+  // Compact, the band is this line, read as the foot's status line is
+  const failed: Segment[] = model.problem === null ? [] : [{ text: 'last read failed', color: 'error' }]
 
-  // Compact, the header is the whole band: what lands next comes first, the
-  // part a narrow band cuts last
-  if (model.isCompact) {
-    const compact: Segment[] = [
-      { text: BAND_TITLE, bold: true },
-      { text: ' · ', dim: true },
-      ...(snapshot.next === null
-        ? [{ text: 'nothing ready', dim: true }]
-        : [{ text: 'next → ', dim: true }, { text: sanitize(snapshot.next), color: 'success' as const, bold: true }]),
-      ...(model.problem === null ? [] : [{ text: ' · ', dim: true }, { text: 'last read failed', color: 'error' as const }]),
-      ...then,
-    ]
-
-    return { key: 'header', segments: fitSegments(compact, headerRoomOf(model, columns)) }
-  }
-
-  segments.push({ text: ` → ${sanitize(snapshot.base.name)}`, dim: true }, ...then)
-
-  return { key: 'header', segments: fitSegments(segments, headerRoomOf(model, columns)) }
+  return { key: 'header', segments: firstFitting(statusLayoutsOf(model, snapshot, failed), room) }
 }
 
 /**
@@ -612,101 +671,117 @@ function countGroupsOf(snapshot: Snapshot): Segment[][] {
 }
 
 /**
- * What each lane holds, in lane order: `3 ready`, `1 stacked`.
+ * What each lane holds, in lane order: `3 ready`, `1 stacked`; with the
+ * short labels, `2 rebase`, `1 wip`.
  */
-function countsOf(snapshot: Snapshot): Segment[] {
-  return (Object.keys(LANE_LABELS) as Lane[]).flatMap((lane, at, lanes) => {
+function countsOf(snapshot: Snapshot, labels: Readonly<Record<Lane, string>> = LANE_LABELS): Segment[] {
+  return (Object.keys(labels) as Lane[]).flatMap((lane, at, lanes) => {
     const count = snapshot.branches.filter(branch => branch.lane === lane).length
     const isFirst = lanes.slice(0, at).every(earlier => !snapshot.branches.some(branch => branch.lane === earlier))
 
     return count === 0
       ? []
-      : [...(isFirst ? [] : [{ text: ' · ', dim: true }]), { text: `${count} ${LANE_LABELS[lane]}`, color: LANE_COLORS[lane] }]
+      : [...(isFirst ? [] : [{ text: ' · ', dim: true }]), { text: `${count} ${labels[lane]}`, color: LANE_COLORS[lane] }]
   })
 }
 
 /**
- * The summary at the foot's right end, longest first: the radar, the
- * repository and its base, and the counts; a narrow band drops the title,
- * then the repository, and keeps the counts.
+ * The status line's layouts, fullest first: the title, the place, the
+ * counts and what lands next; then the counts in short labels, then without
+ * the title (the sweep stays), without the place, without the counts.
  */
-function summariesOf(model: BandModel, snapshot: Snapshot): Segment[][] {
+function statusLayoutsOf(model: BandModel, snapshot: Snapshot, after: readonly Segment[]): Segment[][] {
+  const place = placeOf(model, snapshot)
   const counts = countsOf(snapshot)
-  const place: Segment = {
-    text: `${sanitize(nameOf(snapshot.repo || model.root))} → ${sanitize(snapshot.base.name)}`,
-    dim: true,
-  }
-  const then: Segment[] = counts.length === 0 ? [] : [{ text: ' · ', dim: true }, ...counts]
+  const short = countsOf(snapshot, SHORT_LANE_LABELS)
+  const next = nextOf(snapshot)
+  const sweptPlace: Segment[] = [{ text: `${model.sweep} `, color: 'suggestion' }, ...place]
 
-  return [[{ text: BAND_TITLE, bold: true }, { text: ' · ', dim: true }, place, ...then], [place, ...then], counts]
+  return [
+    joined([titleOf(model.sweep), place, counts, next, after]),
+    joined([titleOf(model.sweep), place, short, next, after]),
+    joined([sweptPlace, short, next, after]),
+    joined([place, short, next, after]),
+    joined([short, next, after]),
+    joined([next, after]),
+  ]
 }
 
 /**
- * Cells between the foot's left part and the summary, at the least.
+ * Cells between the foot's left part and its messages, at the least, and
+ * the fewest cells a message is shown in.
  */
 const FOOT_GAP_CELLS = 3
+const FOOT_MESSAGE_MIN_CELLS = 10
 
 /**
- * The foot: what lands next, the caller's line and what to know on the
- * left; the summary right-aligned, when there is room for some of it.
+ * How many of the status line's fullest layouts a message may push the
+ * line down through: the long labels and the title, not the place.
  */
-function footOf(model: BandModel, snapshot: Snapshot, columns: number, hasSummary = true): Line {
-  const left = footLeftOf(model, snapshot)
-  const leftCells = lineWidthOf({ key: '', segments: left })
+const MESSAGE_OUTRANKS = 3
 
-  // With no queue, the title stands on top and says it all
-  if (!hasSummary) {
-    return { key: 'foot', segments: fitSegments(left, columns) }
-  }
-
-  for (const summary of summariesOf(model, snapshot)) {
-    const cells = lineWidthOf({ key: '', segments: summary })
-
-    if (leftCells + FOOT_GAP_CELLS + cells <= columns) {
-      return { key: 'foot', segments: [...left, { text: ' '.repeat(columns - leftCells - cells) }, ...summary] }
-    }
-  }
-
-  // Short of room for every count, the ones that fit whole, right-aligned
-  const counts = fitWhole(countGroupsOf(snapshot), columns - leftCells - FOOT_GAP_CELLS)
-  const countCells = lineWidthOf({ key: '', segments: counts })
+/**
+ * The foot, a status line read left to right: the radar, where it looks,
+ * what each lane holds, what lands next. Its right end is for messages: a
+ * caller's line, then what to know (uncommitted files in the main worktree,
+ * sessions unknown, a failed read). A narrow band gives up the messages,
+ * then the long lane labels, the title (the sweep stays), the place and the
+ * counts, before what lands next.
+ */
+function footOf(model: BandModel, snapshot: Snapshot, columns: number): Line {
+  const layouts = statusLayoutsOf(model, snapshot, [])
+  const messages = joined(messagesOf(model, snapshot).map(message => [message]))
+  const messageCells = lineWidthOf({ key: '', segments: messages })
+  const widthOf = (segments: readonly Segment[]) => lineWidthOf({ key: '', segments })
+  // A message is worth the long labels and the title, never the place, the
+  // counts or what lands next: past those it is cut
+  const roomy = layouts
+    .slice(0, MESSAGE_OUTRANKS)
+    .find(layout => messageCells > 0 && widthOf(layout) + FOOT_GAP_CELLS + messageCells <= columns)
+  const left = roomy ?? firstFitting(layouts, columns)
+  const leftCells = widthOf(left)
+  const room = columns - leftCells - FOOT_GAP_CELLS
+  const shown = room >= FOOT_MESSAGE_MIN_CELLS ? fitSegments(messages, room) : []
+  const shownCells = widthOf(shown)
 
   return {
     key: 'foot',
-    segments:
-      countCells > 0
-        ? [...left, { text: ' '.repeat(columns - leftCells - countCells) }, ...counts]
-        : fitSegments(left, columns),
+    segments: shownCells === 0 ? left : [...left, { text: ' '.repeat(columns - leftCells - shownCells) }, ...shown],
   }
 }
 
 /**
- * The foot's left part: what lands next, then what to know.
+ * The messages at the foot's right end: a caller's line first, then what
+ * to know.
  */
-function footLeftOf(model: BandModel, snapshot: Snapshot): Segment[] {
-  const segments: Segment[] =
-    snapshot.next === null
-      ? [{ text: 'nothing ready to land', dim: true }]
-      : [{ text: 'next → ', dim: true }, { text: sanitize(snapshot.next), color: 'success', bold: true }]
+function messagesOf(model: BandModel, snapshot: Snapshot): Segment[] {
   const dirty = snapshot.base.mainWorktreeDirty ?? 0
+  const messages: Segment[] = []
 
   if (model.status !== null && model.status !== '') {
-    segments.push({ text: ' · ', dim: true }, { text: sanitize(model.status), color: 'remember' })
+    messages.push({ text: sanitize(model.status), color: 'remember' })
   }
 
   if (dirty > 0) {
-    segments.push({ text: ' · ', dim: true }, { text: `main worktree: ${dirty} uncommitted`, color: 'warning' })
+    messages.push({ text: `main worktree: ${dirty} uncommitted`, color: 'warning' })
   }
 
   if (!snapshot.areSessionsKnown) {
-    segments.push({ text: ' · sessions unknown', dim: true })
+    messages.push({ text: 'sessions unknown', dim: true })
   }
 
   if (model.problem !== null) {
-    segments.push({ text: ' · ', dim: true }, { text: `last read failed: ${sanitize(model.problem)}`, color: 'error' })
+    messages.push({ text: `last read failed: ${sanitize(model.problem)}`, color: 'error' })
   }
 
-  return segments
+  return messages
+}
+
+/**
+ * The line between the table and the foot, drawn in the frame's color.
+ */
+function dividerOf(columns: number): Line {
+  return { key: 'divider', segments: [{ text: '─'.repeat(Math.max(columns, 0)), color: 'promptBorder' }] }
 }
 
 function nameOf(path: string): string {
@@ -731,18 +806,7 @@ export function bandLinesOf(model: BandModel): Line[] {
   }
 
   if (snapshot === null) {
-    const header = headerOf(model, null, columns)
-    const text = model.problem === null ? 'reading…' : sanitize(model.problem)
-
-    return [
-      {
-        key: 'header',
-        segments: fitSegments(
-          [...header.segments, { text: ' · ', dim: true }, { text, ...(model.problem === null ? { dim: true } : { color: 'error' as const }) }],
-          headerRoomOf(model, columns),
-        ),
-      },
-    ]
+    return [headerOf(model, null, columns)]
   }
 
   const header = headerOf(model, snapshot, columns)
@@ -752,9 +816,12 @@ export function bandLinesOf(model: BandModel): Line[] {
   }
   if (snapshot.branches.length === 0) {
     return [
-      header,
-      { key: 'empty', segments: fitSegments([{ text: `no branches besides ${sanitize(snapshot.base.name)}`, dim: true }], columns) },
-      footOf(model, snapshot, columns, false),
+      {
+        key: 'empty',
+        segments: fitSegments([{ text: `no branches besides ${sanitize(snapshot.base.name)}`, dim: true }], headerRoomOf(model, columns)),
+      },
+      dividerOf(columns),
+      footOf(model, snapshot, columns),
     ]
   }
 
@@ -762,8 +829,8 @@ export function bandLinesOf(model: BandModel): Line[] {
 
   const nowSeconds = Math.floor(model.now / 1000)
   const folded = new Set<Lane>()
-  // The column names and the foot take a row each
-  const room = Math.max(model.maxRows - 2, 1)
+  // The column names, the divider and the foot take a row each
+  const room = Math.max(model.maxRows - 3, 1)
   const rowsWith = (): number =>
     snapshot.branches.filter(branch => !folded.has(branch.lane)).length +
     [...folded].filter(lane => snapshot.branches.some(branch => branch.lane === lane)).length
@@ -800,7 +867,7 @@ export function bandLinesOf(model: BandModel): Line[] {
     }
   }
 
-  lines.push(foot)
+  lines.push(dividerOf(columns), foot)
 
   return lines
 }
@@ -887,6 +954,16 @@ export function helpLinesOf(base: string, columns: number): Line[] {
         { term: { text: 'forces a rebase of X' }, meaning: 'landing this branch makes X conflict' },
         { term: { text: 'X stacked on it' }, meaning: 'X holds this branch: this one lands first' },
         { term: { text: `landed in ${onto}` }, meaning: `its work reached ${onto} through a merge` },
+      ],
+    },
+    {
+      title: 'Status line',
+      entries: [
+        { term: { text: `${SWEEP_FRAMES[0]} Worktree Radar`, color: 'suggestion' }, meaning: 'the sweep turns a step per check: when it stands still, the radar has stalled' },
+        { term: { text: `repo [${onto}]` }, meaning: `the repository, and the base branch everything lands on` },
+        { term: { text: '3 ready · 1 stacked' }, meaning: 'how many branches each lane holds' },
+        { term: { text: 'land next → X' }, meaning: 'the branch ranked #1' },
+        { term: { text: 'at the right' }, meaning: 'messages: a skill\'s line, uncommitted files in the main worktree, a failed read' },
       ],
     },
     {

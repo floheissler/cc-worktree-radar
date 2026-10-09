@@ -42,7 +42,7 @@ async function fixtureSnapshot(): Promise<Snapshot> {
 }
 
 function modelOf(snapshot: Snapshot | null, changes: Partial<BandModel> = {}): BandModel {
-  return { snapshot, problem: null, status: null, root: '/work', now: NOW, columns: 100, maxRows: 40, isHelpShown: false, isCompact: false, ...changes }
+  return { snapshot, problem: null, status: null, root: '/work', now: NOW, columns: 100, maxRows: 40, isHelpShown: false, isCompact: false, sweep: '◜', ...changes }
 }
 
 const textOf = (line: Line | undefined): string => line?.segments.map(segment => segment.text).join('') ?? ''
@@ -51,7 +51,7 @@ describe('the band laid out', () => {
   test('a header, a row per branch in lane order, and the next to land', async () => {
     const lines = bandLinesOf(modelOf(await fixtureSnapshot(), { columns: 140 }))
 
-    // The column names on top, the summary right-aligned in the foot
+    // The column names on top; under a divider, the status line
     expect(textOf(lines[0])).toMatch(/^ # BRANCH +LANE +AHEAD  AGE  NOTE$/)
     expect(lines.map(line => line.key)).toEqual([
       'columns',
@@ -66,6 +66,7 @@ describe('the band laid out', () => {
       'row:feat/clean',
       'row:feat/landed',
       'row:chore/merged',
+      'divider',
       'foot',
     ])
     expect(textOf(lines[1])).toMatch(/^ 1 feat\/parent\s+ready\s+\+1 +\d+[smhd]  feat\/child stacked on it$/)
@@ -76,10 +77,11 @@ describe('the band laid out', () => {
     expect(textOf(lines.find(line => line.key === 'row:feat/big'))).toMatch(/forces a rebase of #4 fix\/small$/)
     expect(textOf(lines.find(line => line.key === 'row:feat/conflict'))).toMatch(/rebase after feat\/conflict2$/)
     expect(textOf(lines.find(line => line.key === 'row:chore/merged'))).toMatch(/^ - chore\/merged\s+cleanup +nothing beyond main$/)
-    expect(textOf(lines.at(-1))).toMatch(
-      /^next → feat\/parent +Worktree Radar · work → main · 4 ready · 2 needs rebase · 1 stacked · 1 in progress · 1 on hold · 2 cleanup$/,
+    expect(textOf(lines.at(-2))).toBe('─'.repeat(140))
+    expect(lines.at(-2)?.segments[0]).toMatchObject({ color: 'promptBorder' })
+    expect(textOf(lines.at(-1))).toBe(
+      '◜ Worktree Radar · work [main] · 4 ready · 2 needs rebase · 1 stacked · 1 in progress · 1 on hold · 2 cleanup · land next → feat/parent',
     )
-    expect(lineWidthOf(lines.at(-1) as Line)).toBe(140)
   })
 
   test('every row lines up under the column names; the branch column fits the longest name', async () => {
@@ -169,6 +171,7 @@ describe('the band laid out', () => {
       'fold:IN_PROGRESS',
       'row:feat/clean',
       'fold:CLEANUP',
+      'divider',
       'foot',
     ])
     expect(textOf(lines[8])).toBe('   in progress (3): feat/wip, feat/w2, feat/w3')
@@ -183,24 +186,39 @@ describe('the band laid out', () => {
   test('the caller line, a dirty main worktree and a failed read go in the foot', async () => {
     const snapshot = await fixtureSnapshot()
     const dirty = { ...snapshot, base: { ...snapshot.base, mainWorktreeDirty: 2 }, areSessionsKnown: false }
-    const foot = bandLinesOf(modelOf(dirty, { columns: 210, status: 'release v0.4.1 pending', problem: 'index.lock' })).at(-1)
+    const foot = bandLinesOf(modelOf(dirty, { columns: 260, status: 'release v0.4.1 pending', problem: 'index.lock' })).at(-1)
 
-    // Short of room for the whole summary, the foot keeps its counts
+    // The status line on the left, the messages right-aligned at the end
     expect(textOf(foot)).toMatch(
-      /^next → feat\/parent · release v0\.4\.1 pending · main worktree: 2 uncommitted · sessions unknown · last read failed: index\.lock +4 ready · 2 needs rebase · 1 stacked · 1 in progress · 1 on hold · 2 cleanup$/,
+      /^◜ Worktree Radar · work \[main\] · .* · land next → feat\/parent +release v0\.4\.1 pending · main worktree: 2 uncommitted · sessions unknown · last read failed: index\.lock$/,
     )
+    expect(lineWidthOf(foot as Line)).toBe(260)
+
+    // Short of room, the messages go first; the status line keeps what lands next
+    const narrow = bandLinesOf(modelOf(dirty, { columns: 60, status: 'release v0.4.1 pending' })).at(-1)
+
+    expect(textOf(narrow)).toMatch(/^land next → feat\/parent +release v0\.4\.1 pending · main wor…$/)
+
+    // A message outranks the long labels and the title, not the place
+    const message = bandLinesOf(modelOf(snapshot, { columns: 131, status: 'release v0.4.1 pending' })).at(-1)
+
+    expect(textOf(message)).toMatch(/^◜ work \[main\] · 4 ready · 2 rebase · .* · land next → feat\/parent +release v0\.4\.1 pending$/)
   })
 
   test('before the first read, and when there is nothing to read', async () => {
-    expect(bandLinesOf(modelOf(null)).map(textOf)).toEqual(['Worktree Radar · work · reading…'])
+    expect(bandLinesOf(modelOf(null)).map(textOf)).toEqual(['◜ Worktree Radar · reading work…'])
     expect(bandLinesOf(modelOf(null, { problem: 'not in a git repository' })).map(textOf)).toEqual([
-      'Worktree Radar · work · not in a git repository',
+      '◜ Worktree Radar · not in a git repository',
     ])
 
     const snapshot = await fixtureSnapshot()
     const empty = bandLinesOf(modelOf({ ...snapshot, branches: [], next: null }))
 
-    expect(empty.map(textOf)).toEqual(['Worktree Radar · work → main', 'no branches besides main', 'nothing ready to land'])
+    expect(empty.map(textOf)).toEqual([
+      'no branches besides main',
+      '─'.repeat(100),
+      '◜ Worktree Radar · work [main] · nothing ready to land',
+    ])
   })
 
   test('draws untrusted names as text', async () => {
@@ -225,11 +243,11 @@ describe('the band laid out', () => {
     const snapshot = await fixtureSnapshot()
     const lines = bandLinesOf(modelOf(snapshot, { isHelpShown: true, columns: 100 }))
 
-    expect(textOf(lines[0])).toBe('Worktree Radar · work · help')
+    expect(textOf(lines[0])).toBe('Help · what each part of the band means')
     expect(textOf(lines[1])).toBe('Lanes')
 
     // An empty row before each section after the first
-    for (const title of ['On a row', 'Controls']) {
+    for (const title of ['On a row', 'Status line', 'Controls']) {
       const at = lines.findIndex(line => textOf(line) === title)
 
       expect(textOf(lines[at - 1]), title).toBe(' ')
@@ -258,8 +276,17 @@ describe('the band laid out', () => {
     const lines = bandLinesOf(modelOf(snapshot, { isCompact: true, columns: 200 }))
 
     expect(lines.map(textOf)).toEqual([
-      'Worktree Radar · next → feat/parent · 4 ready · 2 needs rebase · 1 stacked · 1 in progress · 1 on hold · 2 cleanup',
+      '◜ Worktree Radar · work [main] · 4 ready · 2 needs rebase · 1 stacked · 1 in progress · 1 on hold · 2 cleanup · land next → feat/parent',
     ])
+
+    // Short of room, the lane labels shorten before the title goes, and the
+    // sweep stays when it does
+    expect(textOf(bandLinesOf(modelOf(snapshot, { isCompact: true, columns: 160 }))[0])).toBe(
+      '◜ Worktree Radar · work [main] · 4 ready · 2 rebase · 1 stack · 1 wip · 1 hold · 2 done · land next → feat/parent',
+    )
+    expect(textOf(bandLinesOf(modelOf(snapshot, { isCompact: true, columns: 128 }))[0])).toBe(
+      '◜ work [main] · 4 ready · 2 rebase · 1 stack · 1 wip · 1 hold · 2 done · land next → feat/parent',
+    )
 
     for (let columns = 1; columns <= 160; columns += 1) {
       const [line, ...rest] = bandLinesOf(modelOf(snapshot, { columns, isCompact: true, problem: 'boom' }))

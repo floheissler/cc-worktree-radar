@@ -122,10 +122,21 @@ the module otherwise:
   drops ahead and shortens the lane labels; narrow keeps `#`, branch and
   lane. A ready row's note says only what else there is (a stack on it, a
   rebase it forces): "merges cleanly" is what ready means. Its first row names the columns (`columnHeaderOf`), the
-  controls at its end; the foot has `next →` and what to know on the left,
-  the summary (title, repository and base, counts) right-aligned, dropping
-  the title, then the repository, then counts that do not fit whole.
-  `fitWhole` keeps whole pieces where a cut one would read wrong.
+  controls at its end. Under a divider (`dividerOf`, reaching the frame's
+  sides over the padding), the foot is a status line read left to right
+  (`statusLayoutsOf`): the sweep and title, `repo [base]`, the counts,
+  `land next →`; messages (a caller's status, what to know) right-aligned.
+  Short of room it gives up, in order, the long lane labels, the title (the
+  sweep stays), the place and the counts; a message may push out the labels
+  and the title (`MESSAGE_OUTRANKS`), never more. Compact, the band is that
+  status line alone. `fitWhole` keeps whole pieces where a cut one would
+  read wrong.
+- The sweep (`sweepOf`) is computed from the time and the poll interval:
+  it moves a step per check with no state of its own, as the polls redraw.
+- The frame's border is Claude Code's, drawn over anything a mod lays on it:
+  checked live on 2.1.295, a title placed with `position: "absolute"` over
+  the top edge did not show, and overlays reach the padding cells only. So
+  the title leads the status line, not the frame.
 - The band is framed (`frameOf`: a rounded border in `promptBorder` and a
   cell of padding, 4 cells and 2 rows) from `FRAME_MIN_COLUMNS` on; the
   lines are laid out for the room inside it. The `[-]` beside the band is

@@ -103,7 +103,7 @@ describe('/radar', () => {
 
       expect(texts.some(text => /^ # BRANCH +LANE/.test(text))).toBe(true)
       expect(texts.some(text => /^ 1 feat\/parent\s+ready/.test(text))).toBe(true)
-      expect(texts.some(text => /^next → feat\/parent +Worktree Radar · work → main · 4 ready/.test(text))).toBe(true)
+      expect(texts.some(text => /^[◜◝◞◟] Worktree Radar · work \[main\] · 4 ready .* · land next → feat\/parent$/.test(text))).toBe(true)
     }
 
     await $.command.run(RADAR)
@@ -131,7 +131,7 @@ describe('/radar', () => {
       const drawn = await narrow.drawn()
 
       expect((drawn as { props: Record<string, unknown> }).props.borderStyle).toBeUndefined()
-      expect(await narrow.find({ type: 'Text', text: /^next → / })).toBeDefined()
+      expect(await narrow.find({ type: 'Text', text: /land next/ })).toBeDefined()
       await narrow.unmount()
     }
   })
@@ -188,7 +188,7 @@ describe('/radar', () => {
 
     const compact = await bandText($)
 
-    expect(compact.some(text => /^Worktree Radar · next → feat\/parent · 4 ready/.test(text))).toBe(true)
+    expect(compact.some(text => /^[◜◝◞◟] work \[main\] · 4 ready .* · land next → feat\/parent$/.test(text))).toBe(true)
     expect(compact.some(text => /^ 1 feat\/parent/.test(text))).toBe(false)
 
     const back = await $.ui.mount({ ...BAND, surface: 'terminal' })
@@ -239,7 +239,7 @@ describe('/radar', () => {
     await $.command.run(RADAR)
     await settled(clock)
 
-    expect(await bandText($)).toContain('Worktree Radar · work · not in a git repository, or git is not installed')
+    expect((await bandText($)).some(text => /^[◜◝◞◟] Worktree Radar · not in a git repository, or git is not installed$/.test(text))).toBe(true)
   })
 
   test('holds a branch from the command, across reads', async ($, on) => {
@@ -253,13 +253,13 @@ describe('/radar', () => {
     const texts = await bandText($)
 
     expect(texts.some(text => /^ - feat\/parent\s+on hold\s+\+1 +\d+[smhd]  needs a review/.test(text))).toBe(true)
-    expect(texts.some(text => text.startsWith('next → feat/ready-a'))).toBe(true)
+    expect(texts.some(text => text.endsWith('land next → feat/ready-a'))).toBe(true)
     expect(toasts).toEqual(['Holding feat/parent'])
 
     await $.command.run({ ...RADAR, args: 'unhold feat/parent' })
     await settled(clock)
 
-    expect((await bandText($)).some(text => text.startsWith('next → feat/parent'))).toBe(true)
+    expect((await bandText($)).some(text => text.endsWith('land next → feat/parent'))).toBe(true)
   })
 })
 
@@ -300,7 +300,7 @@ describe('the radar tool', () => {
     const texts = await bandText($)
 
     expect(texts.some(text => /feat\/conflict\s+needs rebase.*handed back to b-7c/.test(text))).toBe(true)
-    expect(texts.some(text => text.startsWith('next → feat/parent · release v0.4.1 pending'))).toBe(true)
+    expect(texts.some(text => /land next → feat\/parent +release v0\.4\.1 pending$/.test(text))).toBe(true)
   })
 
   test('refuses what it cannot do', async ($, on) => {

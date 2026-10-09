@@ -7,14 +7,15 @@ which are stacked on another, which a Claude session is still working on,
 and the order to land them in.
 
 ```
-╭────────────────────────────────────────────────────────────────────────────────────────────────╮
-│  # BRANCH         LANE        AHEAD  AGE  NOTE                      h: help c: compact x: exit │
-│  1 feat/checkout  ready          +4  12m                                                       │
-│  2 fix/totals     ready          +1   3m  forces a rebase of feat/coupons                      │
-│  - feat/coupons   needs rebase   +6  20m  conflicts: cart.ts · rebase after #2 fix/totals      │
-│  - feat/search    in progress    +2   1m  search-worker busy                                   │
-│ next → feat/checkout   Worktree Radar · shop → main · 2 ready · 1 needs rebase · 1 in progress │
-╰────────────────────────────────────────────────────────────────────────────────────────────────╯
+╭────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│  # BRANCH         LANE        AHEAD  AGE  NOTE                                                      h: help c: compact x: exit │
+│  1 feat/checkout  ready          +4  12m                                                                                       │
+│  2 fix/totals     ready          +1   3m  forces a rebase of feat/coupons                                                      │
+│  - feat/coupons   needs rebase   +6  20m  conflicts: cart.ts · rebase after #2 fix/totals                                      │
+│  - feat/search    in progress    +2   1m  search-worker busy                                                                   │
+│────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────│
+│ ◜ Worktree Radar · shop [main] · 2 ready · 1 needs rebase · 1 in progress · land next → feat/checkout   release v0.4.1 pending │
+╰────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
 ```
 
 It only looks. It never merges, rebases, tags, pushes or moves a ref.
@@ -53,7 +54,16 @@ The band is framed like a panel, with three controls in its header:
 | `c: compact` | folds the radar into one line: what lands next, then the counts; `c: expand` brings the queue back |
 | `x: exit` | closes the radar, as `/radar` does |
 
-Click them, or give the band the keyboard (Ctrl+X Tab, or a click) and press
+Under a divider, the status line reads left to right: the sweep (`◜`, a
+step per check; standing still means the radar stalled) and the title, the
+repository and its base (`shop [main]`), what each lane holds, and what
+lands next. Its right end holds messages: a skill's status line, uncommitted
+files in the main worktree, a failed read. On a narrow band the messages go
+first, then the long lane labels (`2 rebase`, `1 wip`), the title, the
+repository and the counts; `land next` stays to the end. Compact, the band
+is that status line alone.
+
+Click the controls, or give the band the keyboard (Ctrl+X Tab, or a click) and press
 the letter. On a band narrower than 90 columns the labels shorten to
 `h: ?`, `c: -` and `x: ×`. The `[-]` beside the band is Claude Code's own: it
 hides the band (Ctrl+X Ctrl+A), and a mod cannot move it into the frame. It updates by itself while open: every few seconds the radar checks the
