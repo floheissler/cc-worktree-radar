@@ -13,6 +13,7 @@ async function fixtureSnapshot(): Promise<Snapshot> {
     git: gitOf(replayOf().run, '/work'),
     readText: async () => null,
     sessions: [],
+    agents: [],
     holds: HOLDS,
     notes: {},
     dueMarks: {},
@@ -67,17 +68,28 @@ describe('events between two reads', () => {
 
   test('the base moving, a branch done, a session gone idle', async () => {
     const after = withBranch(await fixtureSnapshot(), 'feat/wip', {
-      worktree: { path: 'w', absPath: '/work/w', dirty: 0, isMissing: false, isRebasing: false, sessions: [{ id: 's', name: 'worker', status: 'idle' }] },
+      worktree: { path: 'w', absPath: '/work/w', dirty: 0, isMissing: false, isRebasing: false, sessions: [{ id: 's', name: 'worker', status: 'idle', kind: 'session' }] },
     })
     const moved = { ...after, base: { ...after.base, sha: '0'.repeat(40) } }
     const before = withBranch(
       withBranch(moved, 'chore/merged', { lane: 'READY' }),
       'feat/wip',
-      { worktree: { path: 'w', absPath: '/work/w', dirty: 0, isMissing: false, isRebasing: false, sessions: [{ id: 's', name: 'worker', status: 'busy' }] } },
+      { worktree: { path: 'w', absPath: '/work/w', dirty: 0, isMissing: false, isRebasing: false, sessions: [{ id: 's', name: 'worker', status: 'busy', kind: 'session' }] } },
     )
     const events = eventsOf(before, after)
 
     expect(events.map(event => event.kind)).toEqual(['base-moved', 'session-idle', 'cleanup'])
+
+    // An agent at work, then gone with its worktree's lock: it finished
+    const agent = { id: 'abc', name: 'agent-abc', status: 'running', kind: 'agent' as const, description: 'Fix the totals', parent: 'main' }
+    const working = withBranch(after, 'feat/wip', {
+      worktree: { path: 'w', absPath: '/work/w', dirty: 0, isMissing: false, isRebasing: false, sessions: [agent] },
+    })
+    const done = withBranch(after, 'feat/wip', {
+      worktree: { path: 'w', absPath: '/work/w', dirty: 0, isMissing: false, isRebasing: false, sessions: [] },
+    })
+
+    expect(eventsOf(working, done).map(event => [event.kind, event.text])).toEqual([['session-idle', 'agent agent-abc on feat/wip finished']])
     expect(events[0]?.text).toMatch(/^main moved 0000000→[0-9a-f]{7}$/)
     expect(events[1]?.text).toBe('session worker on feat/wip went idle')
   })

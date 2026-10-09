@@ -26,6 +26,11 @@ export type Worktree = {
    * Its folder is gone.
    */
   readonly isPrunable: boolean
+  /**
+   * Why it is locked (`git worktree lock --reason`): '' for a lock with no
+   * reason, null when it is not locked.
+   */
+  readonly lock: string | null
 }
 
 /**
@@ -79,6 +84,7 @@ export type WorktreeBlock = {
   readonly branch: string | null
   readonly isDetached: boolean
   readonly isPrunable: boolean
+  readonly lock: string | null
 }
 
 /**
@@ -112,6 +118,7 @@ export function parseWorktrees(stdout: string): WorktreeBlock[] {
       branch: branch === undefined || branch === '' ? null : branch.replace(/^refs\/heads\//, ''),
       isDetached: fields.has('detached'),
       isPrunable: fields.has('prunable'),
+      lock: fields.get('locked') ?? null,
     })
   }
 
@@ -203,6 +210,7 @@ export async function readWorktrees(
         branch: block.branch ?? rebased,
         isRebasing: rebased !== null,
         isPrunable: block.isPrunable,
+        lock: block.lock,
       }
     }),
   )

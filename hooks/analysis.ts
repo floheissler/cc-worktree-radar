@@ -13,7 +13,7 @@ import {
   type Head,
   type Worktree,
 } from './repo'
-import { ACTIVE_STATES, sessionsByWorktree, type SessionRow } from './sessions'
+import { ACTIVE_STATES, agentsByWorktree, sessionsByWorktree, type AgentRow, type SessionRow } from './sessions'
 
 /**
  * The radar's read of a repository: every local branch sorted into a lane,
@@ -45,6 +45,10 @@ export type ReadInput = {
    * The machine's Claude sessions; null where they could not be listed.
    */
   readonly sessions: readonly SessionRow[] | null
+  /**
+   * The subagents of the session the radar runs in (`$.agent.list()`).
+   */
+  readonly agents: readonly AgentRow[]
   readonly holds: Readonly<Record<string, Hold>>
   readonly notes: Readonly<Record<string, CallerNote>>
   /**
@@ -284,6 +288,10 @@ async function read(input: ReadInput): Promise<ReadResult> {
     trees.map(tree => tree.path),
     input.sessions ?? [],
   )
+
+  for (const [path, agents] of agentsByWorktree(trees, input.sessions, input.agents)) {
+    attached.set(path, [...(attached.get(path) ?? []), ...agents])
+  }
   const byBranch = new Map<string, Worktree>()
 
   for (const tree of trees) {
@@ -605,7 +613,11 @@ export function summaryOf(info: Omit<BranchInfo, 'summary'>, facts: ReadonlyMap<
   }
 
   for (const session of tree?.sessions ?? []) {
-    notes.push(`session ${session.name} ${session.status}`)
+    notes.push(
+      session.kind === 'agent'
+        ? `agent ${session.name} ${session.status}${session.parent ? ` in session ${session.parent}` : ''}${session.description ? `: ${session.description}` : ''}`
+        : `session ${session.name} ${session.status}`,
+    )
   }
 
   if (tree !== null && lane === 'CLEANUP') {

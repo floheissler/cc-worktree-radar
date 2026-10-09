@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'claude-code/testing'
 
-import type { Snapshot } from '../types'
+import type { SessionInfo, Snapshot } from '../types'
 
 import { readSnapshot } from '../hooks/analysis'
 import { gitOf } from '../hooks/git'
@@ -27,6 +27,7 @@ async function fixtureSnapshot(): Promise<Snapshot> {
     git: gitOf(replayOf().run, '/work'),
     readText: async () => null,
     sessions: [],
+    agents: [],
     holds: HOLDS,
     notes: {},
     dueMarks: {},
@@ -219,6 +220,28 @@ describe('the band laid out', () => {
       '┄'.repeat(100),
       'Worktree Radar · work [main] · nothing ready to land',
     ])
+  })
+
+  test('a running agent\'s row names its task, or its session', async () => {
+    const snapshot = await fixtureSnapshot()
+    const agent = { id: 'abc', name: 'agent-abc', status: 'running', kind: 'agent' as const, description: 'Fix the totals', parent: 'coordinator' }
+    const rowWith = (sessions: readonly SessionInfo[]) =>
+      textOf(
+        bandLinesOf(
+          modelOf(
+            {
+              ...snapshot,
+              branches: snapshot.branches.map(branch =>
+                branch.name === 'feat/wip' && branch.worktree !== null ? { ...branch, worktree: { ...branch.worktree, sessions } } : branch,
+              ),
+            },
+            { columns: 160 },
+          ),
+        ).find(line => line.key === 'row:feat/wip'),
+      )
+
+    expect(rowWith([agent])).toMatch(/in progress .* {2}agent: Fix the totals · /)
+    expect(rowWith([{ ...agent, description: null }])).toMatch(/ {2}agent of coordinator · /)
   })
 
   test('draws untrusted names as text', async () => {

@@ -13,7 +13,7 @@ export type ToolAction = (typeof TOOL_ACTIONS)[number]
 
 export const TOOL_DESCRIPTION = [
   'Worktree Radar: a live, read-only view of every local branch and worktree of the repository, drawn above the prompt, sorted into lanes on their way into the base branch.',
-  'Lanes: READY (clean worktree, no busy session, merges cleanly; ranked, land #1 first), NEEDS_REBASE (conflicts with the base; isRebaseDue when nothing ahead of it in waitsFor still conflicts with it), STACKED (holds another open branch; land that first), IN_PROGRESS (uncommitted changes, a rebase under way, or a busy Claude session there), HOLD, CLEANUP (nothing beyond the base and no session).',
+  'Lanes: READY (clean worktree, no busy session, merges cleanly; ranked, land #1 first), NEEDS_REBASE (conflicts with the base; isRebaseDue when nothing ahead of it in waitsFor still conflicts with it), STACKED (holds another open branch; land that first), IN_PROGRESS (uncommitted changes, a rebase under way, or a busy Claude session or a running subagent there; worktree.sessions lists both, kind session or agent), HOLD, CLEANUP (nothing beyond the base and no session).',
   'It never merges, rebases, tags, pushes or moves a ref.',
   'Actions: open (starts the radar for the session folder and returns the snapshot; `wake` lists events that wake this session with a one-line prompt: ' +
     WAKE_EVENTS.join(', ') +

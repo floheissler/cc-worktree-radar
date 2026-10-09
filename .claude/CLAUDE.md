@@ -52,7 +52,8 @@ work on the next item.
   branch's one-line `summary`.
 - `hooks/repo.ts`: git's branches and worktrees, read and parsed; the base.
 - `hooks/sessions.ts`: `claude agents --json`, and which worktree each
-  session works in.
+  session works in; Claude Code's worktree locks, and which worktree each
+  subagent works in.
 - `hooks/git.ts`: every git run, through one `Git` (`GIT_ENV`, the
   timeout, null for any failure); `mapLimit` for parallel runs.
 - `hooks/changes.ts`: the events between two reads, the wake line, the
@@ -103,6 +104,16 @@ the module otherwise:
   (`readNow` queues at most one more), and again every `REFRESH_MS` with no
   change seen. A poll is cheap: the branch tips, the worktree list and,
   every `SESSIONS_EVERY` polls, `claude agents --json`.
+- A worktree's `sessions` holds who works there: the sessions
+  `claude agents` lists by folder, and subagents (`kind: 'agent'`). A
+  subagent runs inside its parent's process, so the CLI lists no session in
+  its worktree; the radar knows it by the worktree's lock
+  (`agentsByWorktree`): an agent of the radar's own session while
+  `$.agent.list()` says it is not over (its task, `description`, with it),
+  another session's while that session's pid is listed. A running agent puts
+  its branch IN_PROGRESS like a busy session; one that was at work and is
+  gone wakes `session-idle` ("finished"). The row's note is
+  `agent: <task>`, or `agent of <session>`.
 - The rebase order counts a branch as being rebased when its worktree is
   mid-rebase, or when it was found due a rebase (`dueMarks`) and is in
   progress since. `pipeline.py` used its private hand-back records here.
@@ -200,6 +211,24 @@ every step, in tmux on a throwaway repository.
 - A `ready` wake reached a resumed session (`-c`) after a branch appeared,
   so the wake list travels with the save. Haiku in auto mode then merged
   the branch on its own: what a woken model does is the caller's business.
+
+## Subagents' worktrees
+
+Checked live on Claude Code 2.1.295 (2026-10-09), with two Agent-tool
+subagents (`isolation: "worktree"`) watched through the radar.
+
+- Each gets a worktree `.claude/worktrees/agent-<id>` on a branch
+  `worktree-agent-<id>`, from the base's tip, locked with the reason
+  `claude agent agent-<id> (pid <n> start <n>)`: the pid of the parent
+  session's process, and its start time (`/proc/<pid>/stat`, field 22).
+  `claude -w` locks its worktrees the same way: `claude session <name> (pid
+  …)`. The lock is gone once the agent finished; a worktree it left
+  unchanged is removed with its branch.
+- `claude agents --json` lists the parent session (its `pid` is the lock's)
+  and no session in the agent's worktree, so by the CLI alone an agent at
+  work read CLEANUP, then IN_PROGRESS only once it had uncommitted files.
+- `$.agent.list()` gives the session's own agents, their id the lock's
+  `<id>`, with the Agent call's `description` and a `status`.
 
 ## Carried over from cc-file-explorer
 

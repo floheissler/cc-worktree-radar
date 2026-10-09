@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'claude-code/testing'
 
 import { baseOf, countStatus, displayPathOf, parseHeads, parseWorktrees, type Head } from '../hooks/repo'
-import { folderKeyOf, parseSessions, sessionsByWorktree } from '../hooks/sessions'
+import { agentsByWorktree, claudeLockOf, folderKeyOf, parseSessions, sessionsByWorktree } from '../hooks/sessions'
 
 const head = (sha: string): Head => ({ sha, committedAt: 1, upstream: null })
 
@@ -27,9 +27,9 @@ describe('git output', () => {
     )
 
     expect(blocks).toEqual([
-      { path: '/work', branch: 'main', isDetached: false, isPrunable: false },
-      { path: '/work/.claude/worktrees/x', branch: null, isDetached: true, isPrunable: false },
-      { path: '/gone', branch: 'feat/gone', isDetached: false, isPrunable: true },
+      { path: '/work', branch: 'main', isDetached: false, isPrunable: false, lock: null },
+      { path: '/work/.claude/worktrees/x', branch: null, isDetached: true, isPrunable: false, lock: null },
+      { path: '/gone', branch: 'feat/gone', isDetached: false, isPrunable: true, lock: null },
     ])
   })
 
@@ -57,6 +57,45 @@ describe('git output', () => {
   })
 })
 
+describe('worktree locks', () => {
+  test('reads a lock and its reason', () => {
+    const [agent, bare] = parseWorktrees(
+      'worktree /a\nHEAD aaa\nbranch refs/heads/x\nlocked claude agent agent-abc (pid 42 start 7)\n\nworktree /b\nHEAD bbb\nbranch refs/heads/y\nlocked\n\n',
+    )
+
+    expect([agent?.lock, bare?.lock]).toEqual(['claude agent agent-abc (pid 42 start 7)', ''])
+  })
+
+  test('knows Claude Code\'s own locks from any other', () => {
+    expect(claudeLockOf('claude agent agent-abc (pid 42 start 7)')).toEqual({ kind: 'agent', name: 'agent-abc', pid: 42 })
+    expect(claudeLockOf('claude session mock-a (pid 9 start 1)')).toEqual({ kind: 'session', name: 'mock-a', pid: 9 })
+
+    for (const other of ['', 'on a USB stick', 'claude agent agent-abc', null]) {
+      expect(claudeLockOf(other)).toBeNull()
+    }
+  })
+
+  test('attaches an agent to the worktree locked for it while it runs', () => {
+    const trees = [
+      { path: '/w/agent', lock: 'claude agent agent-abc (pid 42 start 7)' },
+      { path: '/w/session', lock: 'claude session mock (pid 42 start 7)' },
+      { path: '/w/plain', lock: null },
+    ]
+    const sessions = [{ id: 's', name: 'coordinator', status: 'busy', kind: 'session' as const, cwd: '/w', pid: 42 }]
+    const running = { id: 'abc', name: 'worker', description: 'Fix the totals', status: 'running' }
+
+    expect([...agentsByWorktree(trees, sessions, [running])]).toEqual([
+      ['/w/agent', [{ id: 'abc', name: 'worker', status: 'running', kind: 'agent', description: 'Fix the totals', parent: 'coordinator' }]],
+    ])
+    expect(agentsByWorktree(trees, sessions, [{ ...running, status: 'killed' }]).size).toBe(0)
+    // Another session's agent needs its session's process listed
+    expect(agentsByWorktree(trees, [], []).size).toBe(0)
+    expect(agentsByWorktree(trees, null, []).size).toBe(0)
+    // Its own agent is known without the listing
+    expect(agentsByWorktree(trees, null, [running]).get('/w/agent')?.[0]).toMatchObject({ status: 'running', parent: null })
+  })
+})
+
 describe('sessions', () => {
   const listed = JSON.stringify([
     { pid: 1, cwd: '/work/.claude/worktrees/x/src', sessionId: 's1', name: 'x-worker', status: 'busy', state: 'working' },
@@ -66,10 +105,10 @@ describe('sessions', () => {
   ])
 
   test('reads claude agents --json, and nothing from what is not a list', () => {
-    expect(parseSessions(listed)?.map(session => [session.id, session.name, session.status])).toEqual([
-      ['s1', 'x-worker', 'busy'],
-      ['s2', 'coordinator', 'idle'],
-      ['s3', 'other', 'idle'],
+    expect(parseSessions(listed)?.map(session => [session.id, session.name, session.status, session.pid])).toEqual([
+      ['s1', 'x-worker', 'busy', 1],
+      ['s2', 'coordinator', 'idle', 2],
+      ['s3', 'other', 'idle', 3],
     ])
     expect(parseSessions('not json')).toBeNull()
     expect(parseSessions('{}')).toBeNull()
@@ -89,7 +128,7 @@ describe('sessions', () => {
 
     const attached = sessionsByWorktree(
       ['C:/Users/Flo/repo'],
-      [{ id: 'a', name: 'w', status: 'busy', cwd: 'c:\\users\\flo\\repo\\src' }],
+      [{ id: 'a', name: 'w', status: 'busy', kind: 'session', cwd: 'c:\\users\\flo\\repo\\src', pid: 1 }],
     )
 
     expect(attached.get('C:/Users/Flo/repo')).toHaveLength(1)

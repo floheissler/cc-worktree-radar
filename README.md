@@ -90,7 +90,7 @@ The last 50 sessions that ended with the radar open are remembered.
 | ready | no uncommitted changes, no busy session, merges cleanly; ranked, land #1 first |
 | needs rebase | conflicts with the base; `rebase due` once nothing that lands before it still conflicts with it, else `rebase after <branch>` |
 | stacked | holds every commit of another open branch, plus its own: land that one first |
-| in progress | uncommitted changes, a rebase under way, or a busy Claude session in its worktree; also a branch with no commits yet whose session is open |
+| in progress | uncommitted changes, a rebase under way, or a busy Claude session in its worktree; also a branch with no commits yet whose session is open, and a worktree a subagent works in (its row says `agent:` and its task) |
 | on hold | parked with `/radar hold` or the tool |
 | cleanup | nothing left to land: `landed in main` when its tip reached the base through a merge (even with its session still open), else no commits and no session |
 
@@ -119,8 +119,9 @@ your own can open the radar and act on what it sees. Allow it in the skill's
 
 `wake` lists the events that wake the session with a one-line prompt
 (`worktree-radar: feat/a is ready to land (#1) · …`): `ready`, `conflict`,
-`rebase-due`, `stacked`, `cleanup`, `base-moved`, `session-idle`. Each event
-wakes once per branch tip. `/radar` itself wakes nothing.
+`rebase-due`, `stacked`, `cleanup`, `base-moved`, `session-idle` (a session
+going idle, or a subagent finishing). Each event wakes once per branch tip.
+`/radar` itself wakes nothing.
 
 The snapshot is JSON (`schema: 1`): the repository, the base (`name`, `sha`,
 `upstream`, uncommitted files in the main worktree), whether sessions could be
@@ -130,7 +131,11 @@ listed, `next`, and per branch: `name`, `sha`, `lane`, `rank`, `ahead`,
 would conflict once it landed), `rebaseCost`, `waitsFor`, `isRebaseDue`,
 `isLanded` (nothing left to land, its tip off the base's first-parent line),
 `hold`, `note`, `worktree` (path, uncommitted files, rebase under way,
-sessions) and a one-line `summary`.
+sessions) and a one-line `summary`. A worktree's `sessions` lists who works
+there: Claude sessions (`kind: "session"`: `id`, `name`, `status`) and
+subagents (`kind: "agent"`: the agent's `id`, which SendMessage addresses,
+`name`, `status`, `description` of its task where the radar's own session
+spawned it, and `parent`, the session it runs in).
 
 ## Settings
 
@@ -145,7 +150,8 @@ In `/config`, under the plugin:
 Everything stays on your machine. The radar runs `git` in your repository
 (reads, plus the in-memory merges of `git merge-tree` and `git commit-tree`,
 whose unreferenced objects `git gc` prunes; no ref, index or worktree is
-touched) and `claude agents --json` to see which sessions work where. It
+touched) and `claude agents --json` to see which sessions work where; a
+subagent's worktree it knows by the lock Claude Code puts on it. It
 sends nothing anywhere. Holds, and the radar each session left open, are kept
 in Claude Code's plugin store on this machine.
 

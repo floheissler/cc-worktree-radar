@@ -56,6 +56,11 @@ function hostOf($: EngineInterface, options: RadarOptions): Host {
     cwd: () => $.session.cwd(),
     sessionId: () => $.session.id(),
     run: (argv, init) => $.process.run(argv, init),
+    agents: () =>
+      $.agent.list().then(
+        agents => agents.map(agent => ({ id: agent.id, name: agent.name ?? null, description: agent.description, status: agent.status })),
+        () => [],
+      ),
     readText: path => $.fs.read(path).then(
       text => text,
       () => null,

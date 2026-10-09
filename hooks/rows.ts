@@ -95,7 +95,7 @@ export const LANE_MEANINGS: Readonly<Record<Lane, string>> = {
   READY: 'merges cleanly into {base}, nothing uncommitted, no busy session in its worktree',
   NEEDS_REBASE: 'conflicts with {base}: it needs a rebase before it can land',
   STACKED: 'holds every commit of another open branch: that one lands first',
-  IN_PROGRESS: 'uncommitted changes, a rebase under way, or a busy Claude session in its worktree',
+  IN_PROGRESS: 'uncommitted changes, a rebase under way, or a busy Claude session or a running subagent in its worktree',
   HOLD: 'parked by you with /radar hold: out of the landing order, whatever else it shows, until you let it go',
   CLEANUP: 'nothing left to land: landed in {base}, or no commits and no session',
 }
@@ -441,6 +441,12 @@ export function noteOf(branch: BranchInfo, base: string, ranks: ReadonlyMap<stri
 
       if (tree?.isRebasing) {
         parts.push({ text: 'rebasing', dim: true })
+      } else if (busy?.kind === 'agent') {
+        // An agent's own name is an id: its task says more, or its session
+        parts.push({
+          text: busy.description ? `agent: ${name(busy.description)}` : busy.parent ? `agent of ${name(busy.parent)}` : `agent ${name(busy.name)}`,
+          dim: true,
+        })
       } else if (busy !== undefined) {
         parts.push({ text: `${name(busy.name)} ${name(busy.status)}`, dim: true })
       }

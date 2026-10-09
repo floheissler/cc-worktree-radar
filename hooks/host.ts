@@ -3,6 +3,7 @@ import type { Timer } from 'claude-code'
 import type { CallerNote, RadarConfig, Snapshot } from '../types'
 
 import type { Run } from './git'
+import type { AgentRow } from './sessions'
 
 /**
  * One value of the radar's session state: read it, or write it from its
@@ -62,6 +63,11 @@ export type Host = {
    * `claude agents --json` for the sessions.
    */
   readonly run: Run
+  /**
+   * The subagents of this session, as `$.agent.list()` gives them; none
+   * where the engine cannot say.
+   */
+  readonly agents: () => Promise<readonly AgentRow[]>
   /**
    * A file's text, or null where it cannot be read.
    */

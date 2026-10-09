@@ -223,16 +223,18 @@ export function createRadar(): Radar {
     const probe = await probeOf(host, git)
 
     lastSessions = probe?.sessions
-    const [holds, notes, dueMarks, now] = await Promise.all([
+    const [holds, notes, dueMarks, now, agents] = await Promise.all([
       holdsFor(host, git, radar.root),
       host.state.notes.get(),
       host.state.dueMarks.get(),
       host.now(),
+      host.agents(),
     ])
     const result = await readSnapshot({
       git,
       readText: host.readText,
       sessions: probe?.sessions ?? null,
+      agents,
       holds,
       notes,
       dueMarks,

@@ -6,7 +6,7 @@
  * - `STACKED`: holds every unmerged commit of another open branch, plus its
  *   own; the other lands first.
  * - `IN_PROGRESS`: uncommitted changes, a rebase under way, or a busy
- *   Claude session in its worktree.
+ *   Claude session or a running subagent in its worktree.
  * - `HOLD`: parked by a person or a caller.
  * - `CLEANUP`: no commits beyond the base and no session: merged or
  *   abandoned.
@@ -14,15 +14,35 @@
 export type Lane = 'READY' | 'NEEDS_REBASE' | 'STACKED' | 'IN_PROGRESS' | 'HOLD' | 'CLEANUP'
 
 /**
- * A Claude Code session working in a worktree, as `claude agents` lists it.
+ * Who works in a worktree: a Claude Code session, as `claude agents` lists
+ * it, or a subagent holding the worktree Claude Code locked for it.
  */
 export type SessionInfo = {
+  /**
+   * The session's id; an agent's id, which SendMessage addresses it by.
+   */
   readonly id: string
+  /**
+   * The session's name; an agent's, or `agent-<id>`.
+   */
   readonly name: string
   /**
-   * `idle`, `busy`, or another state the CLI reports.
+   * `idle`, `busy`, or another state the CLI reports; an agent's `running`,
+   * or the state Claude Code gives an agent of the radar's own session
+   * (`pending`, `waiting`, `idle`).
    */
   readonly status: string
+  readonly kind: 'session' | 'agent'
+  /**
+   * An agent's task in a few words, known for the agents of the session the
+   * radar runs in; null for another session's. Absent on a session.
+   */
+  readonly description?: string | null
+  /**
+   * The session an agent runs in, by name; null where it is not listed.
+   * Absent on a session.
+   */
+  readonly parent?: string | null
 }
 
 export type WorktreeInfo = {

@@ -101,6 +101,20 @@ export function eventsOf(before: Snapshot | null, after: Snapshot): RadarEvent[]
     }
 
     const busy = new Map((was?.worktree?.sessions ?? []).map(session => [session.id, session]))
+    const here = new Set((branch.worktree?.sessions ?? []).map(session => session.id))
+
+    // An agent that was at work and is gone has finished: its worktree's
+    // lock went with it
+    for (const prior of busy.values()) {
+      if (prior.kind === 'agent' && ACTIVE_STATES.has(prior.status) && !here.has(prior.id)) {
+        events.push({
+          kind: 'session-idle',
+          key: `session-idle:${prior.id}:${branch.sha}`,
+          text: `agent ${prior.name} on ${branch.name} finished`,
+          branch,
+        })
+      }
+    }
 
     for (const session of branch.worktree?.sessions ?? []) {
       const prior = busy.get(session.id)

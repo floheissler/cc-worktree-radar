@@ -12,6 +12,7 @@ function inputOf(run: ReturnType<typeof replayOf>['run'], changes: Partial<ReadI
     git: gitOf(run, '/work'),
     readText: async () => null,
     sessions: [],
+    agents: [],
     holds: HOLDS,
     notes: {},
     dueMarks: {},
@@ -62,11 +63,11 @@ describe('reading a repository', () => {
   })
 
   test('puts a branch with a busy session in progress, and an idle one by its merge', async () => {
-    const sessions = [{ id: 's1', name: 'wip-session', status: 'idle', cwd: '/work/.claude/worktrees/wip' }]
+    const sessions = [{ id: 's1', name: 'wip-session', status: 'idle', kind: 'session' as const, cwd: '/work/.claude/worktrees/wip', pid: 1 }]
     const idle = await snapshotOf(inputOf(replayOf().run, { sessions }))
 
     expect(idle.branches.find(branch => branch.name === 'feat/wip')?.worktree?.sessions).toEqual([
-      { id: 's1', name: 'wip-session', status: 'idle' },
+      { id: 's1', name: 'wip-session', status: 'idle', kind: 'session' },
     ])
     expect(idle.areSessionsKnown).toBe(true)
 
@@ -89,7 +90,7 @@ describe('reading a repository', () => {
   })
 
   test('a session left idle on a landed branch keeps it in cleanup; a busy one does not', async () => {
-    const at = (status: string) => [{ id: 's', name: 'worker', status, cwd: '/work/.claude/worktrees/landed' }]
+    const at = (status: string) => [{ id: 's', name: 'worker', status, kind: 'session' as const, cwd: '/work/.claude/worktrees/landed', pid: 1 }]
     const idle = await snapshotOf(inputOf(replayOf().run, { sessions: at('idle') }))
     const busy = await snapshotOf(inputOf(replayOf().run, { sessions: at('busy') }))
 
@@ -98,6 +99,56 @@ describe('reading a repository', () => {
       lane: 'IN_PROGRESS',
       summary: 'landed in main, new work under way · session worker busy',
     })
+  })
+
+  test('a worktree a running subagent holds is in progress, by its lock', async () => {
+    // Claude Code's lock on the landed branch's worktree, for an agent of the
+    // session with pid 42
+    const key = JSON.stringify(['/work', 'worktree', 'list', '--porcelain'])
+    const listed = RUNS[key] as { code: number; stdout: string }
+    const locked = {
+      ...RUNS,
+      [key]: {
+        ...listed,
+        stdout: listed.stdout.replace(
+          'branch refs/heads/feat/landed\n',
+          'branch refs/heads/feat/landed\nlocked claude agent agent-abc (pid 42 start 7)\n',
+        ),
+      },
+    }
+    const coordinator = [{ id: 's', name: 'coordinator', status: 'busy', kind: 'session' as const, cwd: '/work', pid: 42 }]
+    const landedOf = async (changes: Partial<ReadInput>) =>
+      (await snapshotOf(inputOf(replayOf(locked).run, changes))).branches.find(branch => branch.name === 'feat/landed')
+
+    // The radar's own session's agent: its task and state from $.agent.list()
+    const own = await landedOf({
+      sessions: coordinator,
+      agents: [{ id: 'abc', name: null, description: 'Fix the totals', status: 'running' }],
+    })
+
+    expect(own?.lane).toBe('IN_PROGRESS')
+    expect(own?.worktree?.sessions).toEqual([
+      { id: 'abc', name: 'agent-abc', status: 'running', kind: 'agent', description: 'Fix the totals', parent: 'coordinator' },
+    ])
+    expect(own?.summary).toBe('landed in main, new work under way · agent agent-abc running in session coordinator: Fix the totals')
+
+    // Another session's agent: by its lock, while that session's process runs
+    const other = await landedOf({ sessions: coordinator })
+
+    expect(other?.lane).toBe('IN_PROGRESS')
+    expect(other?.worktree?.sessions).toEqual([
+      { id: 'abc', name: 'agent-abc', status: 'running', kind: 'agent', description: null, parent: 'coordinator' },
+    ])
+
+    // A lock that outlived its agent, or its session, or that nothing can
+    // confirm, holds nobody
+    for (const changes of [
+      { sessions: coordinator, agents: [{ id: 'abc', name: null, description: 'Fix the totals', status: 'completed' }] },
+      { sessions: [] },
+      { sessions: null },
+    ]) {
+      expect(await landedOf(changes)).toMatchObject({ lane: 'CLEANUP', worktree: { sessions: [] } })
+    }
   })
 
   test('shows a caller note only on the tip it was set on', async () => {
