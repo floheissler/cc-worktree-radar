@@ -75,7 +75,7 @@ The radar belongs to the conversation it was opened in:
 
 | You | The radar |
 |---|---|
-| resume a session: `claude --continue`, `claude --resume`, `/resume` | comes back as that session left it: open or closed, folded or not, with a skill's wake list, status line and notes |
+| resume a session: `claude --continue`, `claude --resume`, `/resume` | comes back as that session left it: open or closed, folded or not, with a skill's wake list, status line and comments |
 | start a new session | stays closed |
 | `/clear` | stays as it was, but wakes nothing until a skill opens it again: the wakes were asked for by the conversation you cleared |
 | `/branch` | stays as it was in the branch, wake list and all |
@@ -114,7 +114,7 @@ your own can open the radar and act on what it sees. Allow it in the skill's
 | `snapshot` | | Reads now and answers the snapshot |
 | `close` | | Closes the radar |
 | `hold`, `unhold` | `branch`, `reason?` | Parks a branch, or lets it go |
-| `note` | `branch`, `text` | A short note on the branch's row, shown until its tip moves; empty text clears it |
+| `comment` | `branch`, `text` | A short comment on the branch's row, shown until its tip moves; empty text clears it |
 | `status` | `text` | One line under the queue (`release v0.4.1 pending`); empty text clears it |
 
 `wake` lists the events that wake the session with a one-line prompt
@@ -130,7 +130,7 @@ listed, `next`, and per branch: `name`, `sha`, `lane`, `rank`, `ahead`,
 `conflicts`, `stackedOn`, `dependents`, `sharesWith`, `breaks` (branches that
 would conflict once it landed), `rebaseCost`, `waitsFor`, `isRebaseDue`,
 `isLanded` (nothing left to land, its tip off the base's first-parent line),
-`hold`, `note`, `worktree` (path, uncommitted files, rebase under way,
+`hold`, `comment`, `worktree` (path, uncommitted files, rebase under way,
 sessions) and a one-line `summary`. A worktree's `sessions` lists who works
 there: Claude sessions (`kind: "session"`: `id`, `name`, `status`) and
 subagents (`kind: "agent"`: the agent's `id`, which SendMessage addresses,

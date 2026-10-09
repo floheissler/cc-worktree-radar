@@ -1,6 +1,6 @@
 import type { Timer } from 'claude-code'
 
-import type { CallerNote, RadarConfig, Snapshot } from '../types'
+import type { CallerComment, RadarConfig, Snapshot } from '../types'
 
 import type { Run } from './git'
 import type { AgentRow } from './sessions'
@@ -21,7 +21,7 @@ export type RadarState = {
   readonly radar: StateCell<RadarConfig | null>
   readonly snapshot: StateCell<Snapshot | null>
   readonly problem: StateCell<string | null>
-  readonly notes: StateCell<Record<string, CallerNote>>
+  readonly comments: StateCell<Record<string, CallerComment>>
   readonly status: StateCell<string | null>
   readonly helpShown: StateCell<boolean>
   readonly compact: StateCell<boolean>

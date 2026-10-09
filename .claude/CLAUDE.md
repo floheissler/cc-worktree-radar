@@ -42,7 +42,7 @@ work on the next item.
 - `hooks/host.ts`: the `Host` record the rest of the code takes instead of
   `$`, and the person's settings (`RadarOptions`).
 - `hooks/radar.ts`: the radar at work while open: polls, reads, holds and
-  notes, and what a read tells the session (wake prompts, notifications).
+  comments, and what a read tells the session (wake prompts, notifications).
 - `hooks/saved.ts`: the radar a session left open, kept in the store for
   its resume: the record, its checked reading, the save, the forget and
   the cap.
@@ -129,7 +129,7 @@ the module otherwise:
   in `$.store` under `resume:` and the session's id (`saved.ts`), one key per
   session: saved at open (`openRadar`, so a process that dies still
   resumes it) and as it stands at `session.end` (the config with the
-  caller's wake list, `compact`, `status`, `notes`, `dueMarks`; not the read,
+  caller's wake list, `compact`, `status`, `comments`, `dueMarks`; not the read,
   not the help); a close forgets it, a closed radar writes nothing.
   `session.start` in an interactive new process reopens what its
   `$.session.id()` left (`claude --continue`, `--resume`). In the process,

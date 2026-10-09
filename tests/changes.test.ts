@@ -15,7 +15,7 @@ async function fixtureSnapshot(): Promise<Snapshot> {
     sessions: [],
     agents: [],
     holds: HOLDS,
-    notes: {},
+    comments: {},
     dueMarks: {},
     base: null,
     now: 0,

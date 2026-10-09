@@ -29,7 +29,7 @@ async function fixtureSnapshot(): Promise<Snapshot> {
     sessions: [],
     agents: [],
     holds: HOLDS,
-    notes: {},
+    comments: {},
     dueMarks: {},
     base: null,
     now: NOW,
@@ -248,7 +248,7 @@ describe('the band laid out', () => {
     const snapshot = await fixtureSnapshot()
     const evil = {
       ...snapshot,
-      branches: snapshot.branches.map(branch => (branch.name === 'feat/parent' ? { ...branch, name: 'feat/\u001b[31mred', note: 'a\nb' } : branch)),
+      branches: snapshot.branches.map(branch => (branch.name === 'feat/parent' ? { ...branch, name: 'feat/\u001b[31mred', comment: 'a\nb' } : branch)),
     }
     const row = textOf(bandLinesOf(modelOf(evil, { columns: 160 }))[1])
 

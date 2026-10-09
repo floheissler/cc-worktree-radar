@@ -14,7 +14,7 @@ function inputOf(run: ReturnType<typeof replayOf>['run'], changes: Partial<ReadI
     sessions: [],
     agents: [],
     holds: HOLDS,
-    notes: {},
+    comments: {},
     dueMarks: {},
     base: null,
     now: 1_800_000_000_000,
@@ -151,17 +151,17 @@ describe('reading a repository', () => {
     }
   })
 
-  test('shows a caller note only on the tip it was set on', async () => {
+  test('shows a caller comment only on the tip it was set on', async () => {
     const first = await snapshotOf(inputOf(replayOf().run))
     const ready = first.branches.find(branch => branch.name === 'feat/ready-a')
-    const notes = {
+    const comments = {
       'feat/ready-a': { sha: ready?.sha ?? '', text: 'handed back to b-7c' },
       'feat/big': { sha: 'an-old-tip', text: 'stale' },
     }
-    const second = await snapshotOf(inputOf(replayOf().run, { notes }))
+    const second = await snapshotOf(inputOf(replayOf().run, { comments }))
 
-    expect(second.branches.find(branch => branch.name === 'feat/ready-a')?.note).toBe('handed back to b-7c')
-    expect(second.branches.find(branch => branch.name === 'feat/big')?.note).toBeNull()
+    expect(second.branches.find(branch => branch.name === 'feat/ready-a')?.comment).toBe('handed back to b-7c')
+    expect(second.branches.find(branch => branch.name === 'feat/big')?.comment).toBeNull()
   })
 
   test('marks a branch due a rebase once nothing ahead of it conflicts', async () => {

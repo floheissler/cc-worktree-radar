@@ -26,9 +26,9 @@ const Limits = {
    */
   SETTLE_MS: 2_000,
   /**
-   * Longest a caller's note or status line is kept, in characters.
+   * Longest a caller's comment or status line is kept, in characters.
    */
-  NOTE_CHARS: 200,
+  COMMENT_CHARS: 200,
   /**
    * Longest a hold's reason is kept, in characters.
    */
@@ -45,7 +45,7 @@ const Limits = {
   /**
    * Sessions whose open radar the store keeps for a resume; past it, the
    * one saved longest ago is dropped. One is a few hundred bytes, more with
-   * a caller's notes.
+   * a caller's comments.
    */
   SAVED_SESSIONS: 50,
 } as const

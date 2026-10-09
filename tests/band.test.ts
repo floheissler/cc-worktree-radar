@@ -315,17 +315,17 @@ describe('the radar tool', () => {
     expect((await bandText($)).some(text => text.startsWith('Worktree Radar'))).toBe(true)
   })
 
-  test('notes a branch and sets the line under the queue', async ($, on) => {
+  test('comments on a branch and sets the line under the queue', async ($, on) => {
     const { clock } = worldOf(on)
     const opened = $.tool.call({ tool: TOOL, action: 'open' } as never)
 
     await settled(clock)
     await opened
 
-    const noted = $.tool.call({ tool: TOOL, action: 'note', branch: 'feat/conflict', text: 'handed back to b-7c' } as never)
+    const commented = $.tool.call({ tool: TOOL, action: 'comment', branch: 'feat/conflict', text: 'handed back to b-7c' } as never)
 
     await settled(clock)
-    await noted
+    await commented
 
     const status = await $.tool.call({ tool: TOOL, action: 'status', text: 'release v0.4.1 pending' } as never)
 
@@ -400,10 +400,10 @@ describe('across sessions', () => {
     await settled(clock)
     await ui.unmount()
 
-    const noted = $.tool.call({ tool: TOOL, action: 'note', branch: 'feat/conflict', text: 'handed back to b-7c' } as never)
+    const commented = $.tool.call({ tool: TOOL, action: 'comment', branch: 'feat/conflict', text: 'handed back to b-7c' } as never)
 
     await settled(clock)
-    await noted
+    await commented
     await $.tool.call({ tool: TOOL, action: 'status', text: 'release v0.4.1 pending' } as never)
     await $.session.end(endOf('prompt_input_exit'))
 
@@ -411,7 +411,7 @@ describe('across sessions', () => {
       radar: { root: '/work', base: null, wake: ['ready'] },
       compact: true,
       status: 'release v0.4.1 pending',
-      notes: { 'feat/conflict': { sha: tipOf('feat/conflict'), text: 'handed back to b-7c' } },
+      comments: { 'feat/conflict': { sha: tipOf('feat/conflict'), text: 'handed back to b-7c' } },
     })
   })
 
@@ -572,14 +572,14 @@ function tipOf(branch: string): string {
 
 /**
  * A radar a session left open, as the store keeps it: folded, a caller's
- * wakes, line and note.
+ * wakes, line and comment.
  */
 function leftOpen(savedAt = NOW) {
   return {
     radar: { root: '/work', base: null, wake: ['ready'] },
     compact: true,
     status: 'release v0.4.1 pending',
-    notes: { 'feat/conflict': { sha: tipOf('feat/conflict'), text: 'handed back to b-7c' } },
+    comments: { 'feat/conflict': { sha: tipOf('feat/conflict'), text: 'handed back to b-7c' } },
     dueMarks: {},
     savedAt,
   }

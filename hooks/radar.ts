@@ -96,11 +96,11 @@ export type Radar = {
    */
   readonly setHold: (host: Host, root: string, branch: string, reason: string | null) => Promise<string | null>
   /**
-   * Notes a branch's current tip, or clears the note with an empty text.
+   * Comments on a branch's current tip, or clears the comment with an empty text.
    *
    * @returns null, or why not
    */
-  readonly setNote: (host: Host, root: string, branch: string, text: string) => Promise<string | null>
+  readonly setComment: (host: Host, root: string, branch: string, text: string) => Promise<string | null>
 }
 
 /**
@@ -223,9 +223,9 @@ export function createRadar(): Radar {
     const probe = await probeOf(host, git)
 
     lastSessions = probe?.sessions
-    const [holds, notes, dueMarks, now, agents] = await Promise.all([
+    const [holds, comments, dueMarks, now, agents] = await Promise.all([
       holdsFor(host, git, radar.root),
-      host.state.notes.get(),
+      host.state.comments.get(),
       host.state.dueMarks.get(),
       host.now(),
       host.agents(),
@@ -236,7 +236,7 @@ export function createRadar(): Radar {
       sessions: probe?.sessions ?? null,
       agents,
       holds,
-      notes,
+      comments,
       dueMarks,
       base: radar.base,
       now,
@@ -385,7 +385,7 @@ export function createRadar(): Radar {
 
       return null
     },
-    setNote: async (host, root, branch, text) => {
+    setComment: async (host, root, branch, text) => {
       const tip = await gitOf(host.run, root)(['rev-parse', '--verify', '--quiet', `refs/heads/${branch}`])
 
       if (tip === null) {
@@ -393,10 +393,10 @@ export function createRadar(): Radar {
       }
 
       const sha = tip.stdout.trim()
-      const kept = clipChars(text.trim(), Limits.NOTE_CHARS)
+      const kept = clipChars(text.trim(), Limits.COMMENT_CHARS)
 
-      await host.state.notes.set(notes => {
-        const next = { ...notes }
+      await host.state.comments.set(comments => {
+        const next = { ...comments }
 
         if (kept === '') {
           delete next[branch]

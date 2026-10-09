@@ -1,4 +1,4 @@
-import type { CallerNote, RadarConfig } from '../types'
+import type { CallerComment, RadarConfig } from '../types'
 
 import { wakeEventsOf } from './changes'
 import type { Host } from './host'
@@ -29,7 +29,7 @@ export type SavedRadar = {
   readonly radar: RadarConfig
   readonly compact: boolean
   readonly status: string | null
-  readonly notes: Readonly<Record<string, CallerNote>>
+  readonly comments: Readonly<Record<string, CallerComment>>
   readonly dueMarks: Readonly<Record<string, string>>
   /**
    * When it was saved, in milliseconds since the epoch.
@@ -45,18 +45,18 @@ function fieldsOf(value: unknown): Readonly<Record<string, unknown>> | null {
   return value !== null && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : null
 }
 
-function notesIn(value: unknown): Record<string, CallerNote> {
-  const notes: Record<string, CallerNote> = {}
+function commentsIn(value: unknown): Record<string, CallerComment> {
+  const comments: Record<string, CallerComment> = {}
 
-  for (const [branch, note] of Object.entries(fieldsOf(value) ?? {})) {
-    const fields = fieldsOf(note)
+  for (const [branch, comment] of Object.entries(fieldsOf(value) ?? {})) {
+    const fields = fieldsOf(comment)
 
     if (fields !== null && typeof fields['sha'] === 'string' && typeof fields['text'] === 'string' && fields['text'] !== '') {
-      notes[branch] = { sha: fields['sha'], text: clipChars(fields['text'], Limits.NOTE_CHARS) }
+      comments[branch] = { sha: fields['sha'], text: clipChars(fields['text'], Limits.COMMENT_CHARS) }
     }
   }
 
-  return notes
+  return comments
 }
 
 function dueMarksIn(value: unknown): Record<string, string> {
@@ -97,8 +97,8 @@ export function savedRadarIn(value: unknown): SavedRadar | null {
       wake: wakeEventsOf(radar['wake']),
     },
     compact: fields['compact'] === true,
-    status: typeof status === 'string' && status !== '' ? clipChars(status, Limits.NOTE_CHARS) : null,
-    notes: notesIn(fields['notes']),
+    status: typeof status === 'string' && status !== '' ? clipChars(status, Limits.COMMENT_CHARS) : null,
+    comments: commentsIn(fields['comments']),
     dueMarks: dueMarksIn(fields['dueMarks']),
     savedAt: typeof savedAt === 'number' && Number.isFinite(savedAt) ? savedAt : 0,
   }
@@ -126,16 +126,16 @@ export function droppedKeysOf(saved: readonly { readonly key: string; readonly s
  * @returns the radar to save, or null while it is closed
  */
 export async function savedRadarOf(host: Host): Promise<SavedRadar | null> {
-  const [radar, compact, status, notes, dueMarks, savedAt] = await Promise.all([
+  const [radar, compact, status, comments, dueMarks, savedAt] = await Promise.all([
     host.state.radar.get(),
     host.state.compact.get(),
     host.state.status.get(),
-    host.state.notes.get(),
+    host.state.comments.get(),
     host.state.dueMarks.get(),
     host.now(),
   ])
 
-  return radar === null ? null : { radar, compact, status, notes, dueMarks, savedAt }
+  return radar === null ? null : { radar, compact, status, comments, dueMarks, savedAt }
 }
 
 /**

@@ -33,7 +33,7 @@ describe('the radar tool', () => {
       branch: 'feat/x',
       reason: 'r',
     })
-    expect(toolRequestOf({ action: 'note', branch: 'feat/x' })).toEqual({ action: 'note', branch: 'feat/x', text: '' })
+    expect(toolRequestOf({ action: 'comment', branch: 'feat/x' })).toEqual({ action: 'comment', branch: 'feat/x', text: '' })
     expect(toolRequestOf({ action: 'unhold' })).toEqual({ error: 'unhold needs a branch' })
     expect(toolRequestOf({ action: 'merge' })).toHaveProperty('error')
   })
@@ -70,7 +70,7 @@ describe('the radar tool', () => {
             isRebaseDue: false,
             isLanded: false,
             hold: null,
-            note: null,
+            comment: null,
             worktree: null,
             summary: 'merges cleanly into main',
           },

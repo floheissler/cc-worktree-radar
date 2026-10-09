@@ -134,9 +134,9 @@ export type BranchInfo = {
   readonly isLanded: boolean
   readonly hold: Hold | null
   /**
-   * A caller's note on this tip (the radar tool's `note`).
+   * A caller's comment on this tip (the radar tool's `comment`).
    */
-  readonly note: string | null
+  readonly comment: string | null
   readonly worktree: WorktreeInfo | null
   /**
    * The facts in one line, for people and models.
@@ -204,9 +204,9 @@ export type RadarConfig = {
 }
 
 /**
- * A caller's note, shown while the branch's tip is the one it was set on.
+ * A caller's comment, shown while the branch's tip is the one it was set on.
  */
-export type CallerNote = {
+export type CallerComment = {
   readonly sha: string
   readonly text: string
 }
@@ -227,15 +227,15 @@ declare module 'claude-code' {
        */
       problem: string | null
       /**
-       * Caller notes by branch name.
+       * Caller comments by branch name.
        */
-      notes: Record<string, CallerNote>
+      comments: Record<string, CallerComment>
       /**
        * A caller's line under the queue; null for none.
        */
       status: string | null
       /**
-       * Whether the help (what the lanes and notes mean) stands in for the
+       * Whether the help (what the lanes, details and comments mean) stands in for the
        * queue.
        */
       helpShown: boolean

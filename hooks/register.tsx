@@ -23,7 +23,7 @@ import { bandView } from './view'
 const RADAR = atom({ plugin: 'worktree-radar', key: 'radar' } as const, null)
 const SNAPSHOT = atom({ plugin: 'worktree-radar', key: 'snapshot' } as const, null)
 const PROBLEM = atom({ plugin: 'worktree-radar', key: 'problem' } as const, null)
-const NOTES = atom({ plugin: 'worktree-radar', key: 'notes' } as const, {})
+const COMMENTS = atom({ plugin: 'worktree-radar', key: 'comments' } as const, {})
 const STATUS = atom({ plugin: 'worktree-radar', key: 'status' } as const, null)
 const HELP_SHOWN = atom({ plugin: 'worktree-radar', key: 'helpShown' } as const, false)
 const COMPACT = atom({ plugin: 'worktree-radar', key: 'compact' } as const, false)
@@ -100,10 +100,10 @@ function hostOf($: EngineInterface, options: RadarOptions): Host {
           await update($, PROBLEM, fn)
         },
       },
-      notes: {
-        get: () => read($, NOTES),
+      comments: {
+        get: () => read($, COMMENTS),
         set: async fn => {
-          await update($, NOTES, fn)
+          await update($, COMMENTS, fn)
         },
       },
       status: {
@@ -214,7 +214,7 @@ async function reopenRadar(host: Host, radar: Radar, saved: SavedRadar | null, s
 
   await host.state.compact.set(() => saved.compact)
   await host.state.status.set(() => saved.status)
-  await host.state.notes.set(() => ({ ...saved.notes }))
+  await host.state.comments.set(() => ({ ...saved.comments }))
   await host.state.dueMarks.set(() => ({ ...saved.dueMarks }))
   await host.state.helpShown.set(() => false)
   await host.state.snapshot.set(() => null)
@@ -446,15 +446,15 @@ export const register: Register = (on, pluginOptions) => {
 
         return answerOf(host)
       }
-      case 'note': {
-        const why = await radar.setNote(host, root, request.branch, request.text)
+      case 'comment': {
+        const why = await radar.setComment(host, root, request.branch, request.text)
 
         if (why !== null) {
           return { deny: why }
         }
 
         if (open === null) {
-          return { result: `Noted on ${request.branch}.` }
+          return { result: `Comment set on ${request.branch}.` }
         }
 
         await radar.readNow(host)
@@ -464,7 +464,7 @@ export const register: Register = (on, pluginOptions) => {
       case 'status': {
         const text = request.text.trim()
 
-        await host.state.status.set(() => (text === '' ? null : clipChars(text, Limits.NOTE_CHARS)))
+        await host.state.status.set(() => (text === '' ? null : clipChars(text, Limits.COMMENT_CHARS)))
 
         return { result: text === '' ? 'Status line cleared.' : 'Status line set.' }
       }

@@ -409,8 +409,8 @@ export function noteOf(branch: BranchInfo, base: string, ranks: ReadonlyMap<stri
     return rank === undefined ? name(other) : `#${rank} ${name(other)}`
   }
 
-  if (branch.note !== null) {
-    parts.push({ text: name(branch.note), color: 'remember' })
+  if (branch.comment !== null) {
+    parts.push({ text: name(branch.comment), color: 'remember' })
   }
 
   switch (branch.lane) {

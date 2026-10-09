@@ -1,4 +1,4 @@
-import type { BranchInfo, CallerNote, Hold, Lane, SessionInfo, Snapshot, WorktreeInfo } from '../types'
+import type { BranchInfo, CallerComment, Hold, Lane, SessionInfo, Snapshot, WorktreeInfo } from '../types'
 
 import { mapLimit, type Git } from './git'
 import Limits from './limits'
@@ -50,7 +50,7 @@ export type ReadInput = {
    */
   readonly agents: readonly AgentRow[]
   readonly holds: Readonly<Record<string, Hold>>
-  readonly notes: Readonly<Record<string, CallerNote>>
+  readonly comments: Readonly<Record<string, CallerComment>>
   /**
    * Branches found due a rebase before (`PluginState`'s `dueMarks`).
    */
@@ -240,7 +240,7 @@ export function shortList(items: readonly string[], limit: number = Limits.LIST_
 /**
  * Reads a repository.
  *
- * @param input git, the sessions, holds, notes and marks, the base asked for
+ * @param input git, the sessions, holds, comments and marks, the base asked for
  * @returns the snapshot, or what kept it from being read
  */
 export async function readSnapshot(input: ReadInput): Promise<ReadResult> {
@@ -504,7 +504,7 @@ async function read(input: ReadInput): Promise<ReadResult> {
 }
 
 function branchOf(info: Facts, facts: ReadonlyMap<string, Facts>, base: string, input: ReadInput): BranchInfo {
-  const note = input.notes[info.name]
+  const comment = input.comments[info.name]
   const branch: Omit<BranchInfo, 'summary'> = {
     name: info.name,
     sha: info.sha,
@@ -527,7 +527,7 @@ function branchOf(info: Facts, facts: ReadonlyMap<string, Facts>, base: string, 
     isRebaseDue: info.lane === 'NEEDS_REBASE' && (info.waitsFor?.length ?? 0) === 0,
     isLanded: info.isLanded,
     hold: input.holds[info.name] ?? null,
-    note: note !== undefined && note.sha === info.sha ? note.text : null,
+    comment: comment !== undefined && comment.sha === info.sha ? comment.text : null,
     worktree: info.worktree,
   }
 
@@ -543,30 +543,30 @@ function branchOf(info: Facts, facts: ReadonlyMap<string, Facts>, base: string, 
  * @returns the line
  */
 export function summaryOf(info: Omit<BranchInfo, 'summary'>, facts: ReadonlyMap<string, { commits: ReadonlySet<string> }>, base: string): string {
-  const notes: string[] = []
+  const parts: string[] = []
   const { lane } = info
   const tree = info.worktree
 
   if (lane === 'CLEANUP') {
-    notes.push(info.isLanded ? `landed in ${base}` : `no commits beyond ${base}`)
+    parts.push(info.isLanded ? `landed in ${base}` : `no commits beyond ${base}`)
   }
 
   if (lane === 'HOLD') {
-    notes.push(`on hold${info.hold?.reason ? `: ${info.hold.reason}` : ''}`)
+    parts.push(`on hold${info.hold?.reason ? `: ${info.hold.reason}` : ''}`)
   }
 
   if (info.ahead === 0 && lane === 'IN_PROGRESS') {
-    notes.push(info.isLanded ? `landed in ${base}, new work under way` : 'no commits yet')
+    parts.push(info.isLanded ? `landed in ${base}, new work under way` : 'no commits yet')
   }
 
   if ((info.conflicts?.length ?? 0) > 0) {
-    notes.push(`conflicts with ${base}: ${shortList(info.conflicts ?? [])}`)
+    parts.push(`conflicts with ${base}: ${shortList(info.conflicts ?? [])}`)
   } else if (info.ahead > 0 && (lane === 'READY' || lane === 'HOLD' || lane === 'IN_PROGRESS')) {
-    notes.push(`merges cleanly into ${base}`)
+    parts.push(`merges cleanly into ${base}`)
   }
 
   if (lane === 'NEEDS_REBASE') {
-    notes.push(
+    parts.push(
       (info.waitsFor?.length ?? 0) > 0
         ? `rebase waits for ${shortList(info.waitsFor ?? [], 2)} to land first`
         : `rebase due`,
@@ -576,23 +576,23 @@ export function summaryOf(info: Omit<BranchInfo, 'summary'>, facts: ReadonlyMap<
   if (info.stackedOn !== null) {
     const own = info.ahead - (facts.get(info.stackedOn)?.commits.size ?? 0)
 
-    notes.push(`stacked on ${info.stackedOn} (+${own} own): ${info.stackedOn} lands first`)
+    parts.push(`stacked on ${info.stackedOn} (+${own} own): ${info.stackedOn} lands first`)
   }
 
   if (info.dependents.length > 0) {
-    notes.push(`${shortList(info.dependents)} stacked on it`)
+    parts.push(`${shortList(info.dependents)} stacked on it`)
   }
 
   for (const other of info.sharesWith) {
     const many = other.commits !== 1
 
-    notes.push(
+    parts.push(
       `shares ${other.commits} unmerged commit${many ? 's' : ''} with ${other.branch} (landing either lands ${many ? 'them' : 'it'})`,
     )
   }
 
   if (info.breaks.length > 0) {
-    notes.push(
+    parts.push(
       `landing it forces a rebase of ${shortList(
         info.breaks.map(broken => `${broken.branch} (${shortList(broken.files, 2)})`),
         2,
@@ -601,19 +601,19 @@ export function summaryOf(info: Omit<BranchInfo, 'summary'>, facts: ReadonlyMap<
   }
 
   if (tree?.isRebasing) {
-    notes.push('rebase in progress')
+    parts.push('rebase in progress')
   }
 
   if (tree?.isMissing) {
-    notes.push('worktree folder missing (prunable)')
+    parts.push('worktree folder missing (prunable)')
   } else if ((tree?.dirty ?? 0) > 0) {
     const dirty = tree?.dirty ?? 0
 
-    notes.push(`${dirty} uncommitted file${dirty === 1 ? '' : 's'}`)
+    parts.push(`${dirty} uncommitted file${dirty === 1 ? '' : 's'}`)
   }
 
   for (const session of tree?.sessions ?? []) {
-    notes.push(
+    parts.push(
       session.kind === 'agent'
         ? `agent ${session.name} ${session.status}${session.parent ? ` in session ${session.parent}` : ''}${session.description ? `: ${session.description}` : ''}`
         : `session ${session.name} ${session.status}`,
@@ -621,12 +621,12 @@ export function summaryOf(info: Omit<BranchInfo, 'summary'>, facts: ReadonlyMap<
   }
 
   if (tree !== null && lane === 'CLEANUP') {
-    notes.push(`worktree ${tree.path}`)
+    parts.push(`worktree ${tree.path}`)
   }
 
   if (info.upstream !== null) {
-    notes.push(`pushed to ${info.upstream}`)
+    parts.push(`pushed to ${info.upstream}`)
   }
 
-  return notes.join(' · ')
+  return parts.join(' · ')
 }
