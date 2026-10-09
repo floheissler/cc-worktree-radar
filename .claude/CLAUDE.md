@@ -166,7 +166,11 @@ the module otherwise:
   in `inactive` (light grey on a dark theme), cut inside its quotes. With a
   comment shown, DETAIL is as wide as its longest, up to `DETAIL_SHARE` of
   what the branch leaves, and COMMENT takes the rest, from
-  `COMMENT_MIN_CELLS`. A caller's comment used to lead the note, in blue and
+  `COMMENT_MIN_CELLS`. The facts (branch, ahead, age, detail) are in the
+  theme's text color; dim is for what is not data (the column names, the
+  ` · ` separators, the `-` off the landing order, a folded lane's line),
+  so the grey comment is the one quiet thing on a row. The detail was dim
+  before, the same grey as a comment. A caller's comment used to lead the note, in blue and
   joined by ` · `; the owner could not tell where it ended and the radar's
   words began. The caller's status line stays a blue badge, unquoted: it is
   a status, not a comment. Under a dotted dim rule (`dividerOf`, inside the

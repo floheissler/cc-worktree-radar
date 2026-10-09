@@ -465,62 +465,61 @@ export function detailOf(branch: BranchInfo, base: string, ranks: ReadonlyMap<st
   switch (branch.lane) {
     case 'READY':
       if (branch.dependents.length > 0) {
-        parts.push({ text: `${name(shortList(branch.dependents, 1))} stacked on it`, dim: true })
+        parts.push({ text: `${name(shortList(branch.dependents, 1))} stacked on it` })
       }
 
       // Ready already says it merges cleanly: the detail only adds what else
       if (branch.breaks.length > 0) {
-        parts.push({ text: `forces a rebase of ${shortList(branch.breaks.map(broken => ref(broken.branch)), 1)}`, dim: true })
+        parts.push({ text: `forces a rebase of ${shortList(branch.breaks.map(broken => ref(broken.branch)), 1)}` })
       }
 
       break
     case 'NEEDS_REBASE':
-      parts.push({ text: `conflicts: ${name(shortList(branch.conflicts ?? [], 1))}`, dim: true })
+      parts.push({ text: `conflicts: ${name(shortList(branch.conflicts ?? [], 1))}` })
       parts.push(
         (branch.waitsFor?.length ?? 0) > 0
-          ? { text: `rebase after ${shortList((branch.waitsFor ?? []).map(ref), 1)}`, dim: true }
+          ? { text: `rebase after ${shortList((branch.waitsFor ?? []).map(ref), 1)}` }
           : { text: 'rebase due', color: 'error' },
       )
       break
     case 'STACKED':
-      parts.push({ text: `lands after ${ref(branch.stackedOn ?? '')}`, dim: true })
+      parts.push({ text: `lands after ${ref(branch.stackedOn ?? '')}` })
       break
     case 'IN_PROGRESS': {
       const busy = tree?.sessions.find(session => session.status !== 'idle')
 
       if (tree?.isRebasing) {
-        parts.push({ text: 'rebasing', dim: true })
+        parts.push({ text: 'rebasing' })
       } else if (busy?.kind === 'agent') {
         // An agent's own name is an id: its task says more, or its session
         parts.push({
           text: busy.description ? `agent: ${name(busy.description)}` : busy.parent ? `agent of ${name(busy.parent)}` : `agent ${name(busy.name)}`,
-          dim: true,
         })
       } else if (busy !== undefined) {
-        parts.push({ text: `session ${name(busy.name)} ${name(busy.status)}`, dim: true })
+        parts.push({ text: `session ${name(busy.name)} ${name(busy.status)}` })
       }
 
       if ((tree?.dirty ?? 0) > 0) {
-        parts.push({ text: `${tree?.dirty} uncommitted`, dim: true })
+        parts.push({ text: `${tree?.dirty} uncommitted` })
       }
 
       if (branch.ahead === 0) {
-        parts.push({ text: branch.isLanded ? `landed in ${name(base)}` : 'no commits yet', dim: true })
+        parts.push({ text: branch.isLanded ? `landed in ${name(base)}` : 'no commits yet' })
       }
 
       break
     }
     case 'HOLD':
-      parts.push({ text: branch.hold?.reason ? name(branch.hold.reason) : 'held', dim: true })
+      parts.push({ text: branch.hold?.reason ? name(branch.hold.reason) : 'held' })
       break
     case 'CLEANUP':
       if (branch.isLanded || tree === null) {
-        parts.push({ text: branch.isLanded ? `landed in ${name(base)}` : `nothing beyond ${name(base)}`, dim: true })
+        parts.push({ text: branch.isLanded ? `landed in ${name(base)}` : `nothing beyond ${name(base)}` })
       }
 
       // Where it is, the snapshot says; here, that there is one to remove
       if (tree !== null) {
-        parts.push({ text: 'has a worktree', dim: true })
+        parts.push({ text: 'has a worktree' })
       }
 
       break
@@ -578,12 +577,12 @@ export function rowOf(
   ]
 
   if (table.ahead > 0) {
-    segments.push({ text: (branch.ahead > 0 ? `+${branch.ahead}` : '').padStart(table.ahead), dim: true })
+    segments.push({ text: (branch.ahead > 0 ? `+${branch.ahead}` : '').padStart(table.ahead) })
   }
 
   // The age of a branch with work of its own, beside what it has ahead
   if (table.age > 0) {
-    segments.push({ text: (branch.ahead > 0 ? ageOf(nowSeconds - branch.lastCommitAt) : '').padStart(table.age), dim: true })
+    segments.push({ text: (branch.ahead > 0 ? ageOf(nowSeconds - branch.lastCommitAt) : '').padStart(table.age) })
   }
 
   if (table.hasDetail) {

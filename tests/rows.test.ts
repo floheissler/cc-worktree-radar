@@ -125,6 +125,20 @@ describe('the band laid out', () => {
     expect(laneOf(lines[10])).toMatchObject({ color: 'inactive' })
   })
 
+  test('draws the facts in the text color, and dims only what is not data', async () => {
+    const lines = bandLinesOf(modelOf(await fixtureSnapshot(), { columns: 140 }))
+    const row = lines.find(line => line.key === 'row:feat/parent')
+    const styled = (text: string) => row?.segments.find(segment => segment.text.trim() === text)
+
+    // Ahead, age and the detail as the branch is; the separator dim
+    for (const fact of ['feat/parent', '+1', 'feat/child stacked on it']) {
+      expect(styled(fact), fact).toEqual({ text: expect.any(String) })
+    }
+
+    expect(textOf(lines[0]) !== '' && lines[0]?.segments.every(segment => segment.dim === true)).toBe(true)
+    expect(lines.find(line => line.key === 'row:feat/conflict2')?.segments.find(segment => segment.text === ' · ')).toMatchObject({ dim: true })
+  })
+
   test('never draws a line wider than the band, at any width', async () => {
     const snapshot = await fixtureSnapshot()
 
