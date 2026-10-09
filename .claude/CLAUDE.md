@@ -83,7 +83,13 @@ the module otherwise:
 ## Conventions
 
 - The analysis stays behavior-compatible with `pipeline.py snapshot` for
-  every fact the script computes, minus releases and hand-backs. To check a
+  every fact the script computes, minus releases and hand-backs, and one
+  deliberate difference: a branch with nothing left to land whose tip is off
+  the base's first-parent line (`isLanded`, read with `git rev-list
+  --first-parent`) landed through a merge, so an idle session left in its
+  worktree keeps it in CLEANUP, where the script showed IN_PROGRESS "no
+  commits yet". A fast-forward or a tip older than `FIRST_PARENT_COMMITS`
+  reads as fresh, as before. To check a
   change against real git, run `hooks/analysis.ts` under Node (type
   stripping, with a resolve hook that adds `.ts`) on a throwaway repository
   and compare with `pipeline.py -C <repo> snapshot --json`. Re-record

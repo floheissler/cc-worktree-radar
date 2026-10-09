@@ -215,7 +215,7 @@ export function noteOf(branch: BranchInfo, base: string): Segment[] {
       }
 
       if (branch.ahead === 0) {
-        parts.push({ text: 'no commits yet', dim: true })
+        parts.push({ text: branch.isLanded ? `landed in ${name(base)}` : 'no commits yet', dim: true })
       }
 
       break
@@ -224,7 +224,14 @@ export function noteOf(branch: BranchInfo, base: string): Segment[] {
       parts.push({ text: branch.hold?.reason ? name(branch.hold.reason) : 'held', dim: true })
       break
     case 'CLEANUP':
-      parts.push({ text: tree === null ? `nothing beyond ${name(base)}` : `worktree ${name(tree.path)}`, dim: true })
+      if (branch.isLanded || tree === null) {
+        parts.push({ text: branch.isLanded ? `landed in ${name(base)}` : `nothing beyond ${name(base)}`, dim: true })
+      }
+
+      if (tree !== null) {
+        parts.push({ text: `worktree ${name(tree.path)}`, dim: true })
+      }
+
       break
   }
 

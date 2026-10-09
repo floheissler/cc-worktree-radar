@@ -40,7 +40,7 @@ describe('the band laid out', () => {
     const lines = bandLinesOf(modelOf(await fixtureSnapshot(), { columns: 140 }))
 
     expect(textOf(lines[0])).toBe(
-      'Worktree Radar · work → main · 4 ready · 2 needs rebase · 1 stacked · 1 in progress · 1 on hold · 1 cleanup',
+      'Worktree Radar · work → main · 4 ready · 2 needs rebase · 1 stacked · 1 in progress · 1 on hold · 2 cleanup',
     )
     expect(lines.map(line => line.key)).toEqual([
       'header',
@@ -53,6 +53,7 @@ describe('the band laid out', () => {
       'row:feat/child',
       'row:feat/wip',
       'row:feat/clean',
+      'row:feat/landed',
       'row:chore/merged',
       'foot',
     ])
@@ -126,7 +127,9 @@ describe('the band laid out', () => {
     expect(textOf(lines[10])).toBe('   cleanup (3): chore/a, chore/b, chore/c')
 
     // A lane of one branch never folds: it would take its row anyway
-    expect(bandLinesOf(modelOf(snapshot, { maxRows: 5 })).some(line => line.key.startsWith('fold:'))).toBe(false)
+    expect(bandLinesOf(modelOf(snapshot, { maxRows: 5 })).filter(line => line.key.startsWith('fold:')).map(line => line.key)).toEqual([
+      'fold:CLEANUP',
+    ])
   })
 
   test('the caller line, a dirty main worktree and a failed read go in the foot', async () => {

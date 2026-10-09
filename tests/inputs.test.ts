@@ -67,6 +67,7 @@ describe('the radar tool', () => {
             rebaseCost: 0,
             waitsFor: null,
             isRebaseDue: false,
+            isLanded: false,
             hold: null,
             note: null,
             worktree: null,

@@ -34,6 +34,11 @@ const Limits = {
    */
   REASON_CHARS: 200,
   /**
+   * How far back the base's first-parent line is read to tell a landed
+   * branch from a fresh one; a tip older than that reads as fresh.
+   */
+  FIRST_PARENT_COMMITS: 10_000,
+  /**
    * Names a summary lists before `+n more`.
    */
   LIST_NAMES: 3,

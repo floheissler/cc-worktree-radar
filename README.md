@@ -54,9 +54,9 @@ repository again once a change has settled.
 | ready | no uncommitted changes, no busy session, merges cleanly; ranked, land #1 first |
 | needs rebase | conflicts with the base; `rebase due` once nothing that lands before it still conflicts with it, else `rebase after <branch>` |
 | stacked | holds every commit of another open branch, plus its own: land that one first |
-| in progress | uncommitted changes, a rebase under way, or a busy Claude session in its worktree |
+| in progress | uncommitted changes, a rebase under way, or a busy Claude session in its worktree; also a branch with no commits yet whose session is open |
 | on hold | parked with `/radar hold` or the tool |
-| cleanup | nothing beyond the base and no session: merged or abandoned |
+| cleanup | nothing left to land: `landed in main` when its tip reached the base through a merge (even with its session still open), else no commits and no session |
 
 The ranking: stack parents first, then the landing that forces the least
 rebase work on the other branches (in a conflicting pair the bigger one lands
@@ -92,6 +92,7 @@ listed, `next`, and per branch: `name`, `sha`, `lane`, `rank`, `ahead`,
 `behind`, `fileCount`, `insertions`, `deletions`, `lastCommitAt`, `upstream`,
 `conflicts`, `stackedOn`, `dependents`, `sharesWith`, `breaks` (branches that
 would conflict once it landed), `rebaseCost`, `waitsFor`, `isRebaseDue`,
+`isLanded` (nothing left to land, its tip off the base's first-parent line),
 `hold`, `note`, `worktree` (path, uncommitted files, rebase under way,
 sessions) and a one-line `summary`.
 

@@ -95,7 +95,7 @@ export function eventsOf(before: Snapshot | null, after: Snapshot): RadarEvent[]
       events.push({
         kind: 'cleanup',
         key: `cleanup:${tip}`,
-        text: `${branch.name} has nothing left to land (merged or abandoned)`,
+        text: branch.isLanded ? `${branch.name} landed in ${base}` : `${branch.name} has nothing left to land`,
         branch,
       })
     }

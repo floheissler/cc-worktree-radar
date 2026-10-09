@@ -106,6 +106,12 @@ export type BranchInfo = {
    * NEEDS_REBASE with nothing in `waitsFor`: rebasing it now holds.
    */
   readonly isRebaseDue: boolean
+  /**
+   * Nothing left to land, and its tip reached the base through a merge:
+   * off the base's first-parent line. A branch that never had work of its
+   * own, or landed by a fast-forward, sits on that line and reads false.
+   */
+  readonly isLanded: boolean
   readonly hold: Hold | null
   /**
    * A caller's note on this tip (the radar tool's `note`).

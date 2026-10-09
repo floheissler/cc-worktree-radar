@@ -42,6 +42,7 @@ describe('reading a repository', () => {
         rank: branch.rank,
         waitsFor: branch.waitsFor,
         stackedOn: branch.stackedOn,
+        isLanded: branch.isLanded,
         conflicts: branch.conflicts,
         breaks: branch.breaks.map(broken => broken.branch),
         summary: branch.summary,
@@ -72,6 +73,31 @@ describe('reading a repository', () => {
     const unknown = await snapshotOf(inputOf(replayOf().run, { sessions: null }))
 
     expect(unknown.areSessionsKnown).toBe(false)
+  })
+
+  test('tells a branch that landed through a merge from one that never had work', async () => {
+    const snapshot = await snapshotOf(inputOf(replayOf().run))
+    const landed = snapshot.branches.find(branch => branch.name === 'feat/landed')
+    const fresh = snapshot.branches.find(branch => branch.name === 'chore/merged')
+
+    expect([landed?.lane, landed?.isLanded, landed?.summary]).toEqual([
+      'CLEANUP',
+      true,
+      'landed in main · worktree .claude/worktrees/landed',
+    ])
+    expect([fresh?.lane, fresh?.isLanded]).toEqual(['CLEANUP', false])
+  })
+
+  test('a session left idle on a landed branch keeps it in cleanup; a busy one does not', async () => {
+    const at = (status: string) => [{ id: 's', name: 'worker', status, cwd: '/work/.claude/worktrees/landed' }]
+    const idle = await snapshotOf(inputOf(replayOf().run, { sessions: at('idle') }))
+    const busy = await snapshotOf(inputOf(replayOf().run, { sessions: at('busy') }))
+
+    expect(idle.branches.find(branch => branch.name === 'feat/landed')?.lane).toBe('CLEANUP')
+    expect(busy.branches.find(branch => branch.name === 'feat/landed')).toMatchObject({
+      lane: 'IN_PROGRESS',
+      summary: 'landed in main, new work under way · session worker busy',
+    })
   })
 
   test('shows a caller note only on the tip it was set on', async () => {

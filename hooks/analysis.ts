@@ -92,6 +92,7 @@ type Facts = {
   deletions: number
   conflicts: string[] | null
   tree: string | null
+  isLanded: boolean
   worktree: WorktreeInfo | null
   stackedOn: string | null
   stackParents: string[]
@@ -188,6 +189,7 @@ async function factsOf(
     deletions,
     conflicts,
     tree,
+    isLanded: false,
     worktree: info,
     stackedOn: null,
     stackParents: [],
@@ -299,6 +301,26 @@ async function read(input: ReadInput): Promise<ReadResult> {
   const facts = new Map(list.map(info => [info.name, info]))
   const of = (name: string): Facts => facts.get(name) as Facts
   const open = names.filter(name => of(name).commits.size > 0)
+  const done = names.filter(name => of(name).commits.size === 0)
+
+  // A branch with nothing left to land either landed through a merge (its
+  // tip reached from the base only through a merge's second parent) or never
+  // had work of its own (its tip on the base's first-parent line). A
+  // fast-forward puts a landed tip on that line too, so it reads as fresh;
+  // so does a tip older than the line read, which is how the script read
+  // every such branch.
+  if (done.length > 0) {
+    const line = await git(['rev-list', '--first-parent', `--max-count=${Limits.FIRST_PARENT_COMMITS}`, baseSha])
+
+    if (line !== null) {
+      const onLine = new Set(line.stdout.split('\n').filter(sha => sha !== ''))
+      const isWhole = onLine.size < Limits.FIRST_PARENT_COMMITS
+
+      for (const name of done) {
+        of(name).isLanded = isWhole && !onLine.has(of(name).sha)
+      }
+    }
+  }
 
   // Stacking: B sits on A when A's unmerged commits are a strict subset of
   // B's. Partial overlap (each holds commits the other lacks) has no
@@ -364,7 +386,9 @@ async function read(input: ReadInput): Promise<ReadResult> {
     const isDirty = (tree?.dirty ?? 0) > 0 || tree?.isRebasing === true
 
     if (info.commits.size === 0) {
-      info.lane = isDirty || sessions.length > 0 ? 'IN_PROGRESS' : 'CLEANUP'
+      // An idle session on a landed branch is left over; on a fresh one it
+      // may be about to start
+      info.lane = isDirty || isActive || (sessions.length > 0 && !info.isLanded) ? 'IN_PROGRESS' : 'CLEANUP'
     } else if (input.holds[name] !== undefined) {
       info.lane = 'HOLD'
     } else if (isDirty || isActive) {
@@ -493,6 +517,7 @@ function branchOf(info: Facts, facts: ReadonlyMap<string, Facts>, base: string, 
     rebaseCost: info.rebaseCost,
     waitsFor: info.waitsFor,
     isRebaseDue: info.lane === 'NEEDS_REBASE' && (info.waitsFor?.length ?? 0) === 0,
+    isLanded: info.isLanded,
     hold: input.holds[info.name] ?? null,
     note: note !== undefined && note.sha === info.sha ? note.text : null,
     worktree: info.worktree,
@@ -515,7 +540,7 @@ export function summaryOf(info: Omit<BranchInfo, 'summary'>, facts: ReadonlyMap<
   const tree = info.worktree
 
   if (lane === 'CLEANUP') {
-    notes.push(`no commits beyond ${base}`)
+    notes.push(info.isLanded ? `landed in ${base}` : `no commits beyond ${base}`)
   }
 
   if (lane === 'HOLD') {
@@ -523,7 +548,7 @@ export function summaryOf(info: Omit<BranchInfo, 'summary'>, facts: ReadonlyMap<
   }
 
   if (info.ahead === 0 && lane === 'IN_PROGRESS') {
-    notes.push('no commits yet')
+    notes.push(info.isLanded ? `landed in ${base}, new work under way` : 'no commits yet')
   }
 
   if ((info.conflicts?.length ?? 0) > 0) {
