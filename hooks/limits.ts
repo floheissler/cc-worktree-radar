@@ -42,6 +42,12 @@ const Limits = {
    * Names a summary lists before `+n more`.
    */
   LIST_NAMES: 3,
+  /**
+   * Sessions whose open radar the store keeps for a resume; past it, the
+   * one saved longest ago is dropped. One is a few hundred bytes, more with
+   * a caller's notes.
+   */
+  SAVED_SESSIONS: 50,
 } as const
 
 export default Limits

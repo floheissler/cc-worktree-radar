@@ -1,6 +1,8 @@
 import type { On } from 'claude-code'
 import { describe, expect, mock, test, type Engine, type MockClock } from 'claude-code/testing'
 
+import Limits from '../hooks/limits'
+
 import { HOLDS, RUNS } from './fixtures/repo'
 import { replayOf, type Recorded } from './replay'
 
@@ -30,19 +32,53 @@ const RADAR = {
 const TOOL = 'mcp__worktree-radar__radar'
 
 /**
- * A session in the fixture's repository: git answers from the recording,
- * and what the radar raises (prompts, notifications) is recorded.
+ * The session the tests run in, as `$.session.id()` answers.
  */
-function worldOf(on: On, runs: { current: Recorded } = { current: RUNS }) {
+const SESSION = 'session-a'
+
+/**
+ * A process's first `session.start` in a terminal.
+ */
+const START = { cwd: '/work', surface: 'terminal', isInteractive: true } as const
+
+/**
+ * A session in the fixture's repository: git answers from the recording,
+ * what the radar raises (prompts, notifications) is recorded, and the store
+ * is a map the test reads.
+ *
+ * @param on the test's `on`
+ * @param runs the recording git answers from
+ * @param stored what the store holds besides the fixture's hold
+ */
+function worldOf(on: On, runs: { current: Recorded } = { current: RUNS }, stored: Readonly<Record<string, unknown>> = {}) {
   const clock = mock.clock(on, { now: NOW })
   const prompts: string[] = []
   const notices: string[] = []
   const toasts: string[] = []
-
   // The fixture's hold, where the radar keeps holds: by the repository's
   // shared .git folder
-  mock.store(on, { 'holds:/work/.git': HOLDS })
+  const store = new Map<string, unknown>(Object.entries({ 'holds:/work/.git': HOLDS, ...stored }))
+
+  on('store.get', ($, e) => ({ value: store.get(e.key) }))
+  on('store.set', ($, e) => {
+    store.set(e.key, JSON.parse(JSON.stringify(e.value)))
+
+    return { value: undefined }
+  })
+  on('store.delete', ($, e) => {
+    store.delete(e.key)
+
+    return { value: undefined }
+  })
+  on('store.keys', () => ({ value: [...store.keys()] }))
   on('session.cwd', () => ({ value: '/work' }))
+  on('session.id', () => ({ value: SESSION }))
+  // Claude Code's own steps beneath the plugin as a session starts and ends
+  on('session.start', ($, e) => ({ cwd: e.cwd }))
+  on('session.end', ($, e) => ({ sessionId: e.sessionId }))
+  on('classic.SessionStart', () => ({}))
+  on('command.register', ($, e) => ({ value: { command: e.name } }))
+  on('tool.register', ($, e) => ({ value: { tool: e.name } }))
   on('fs.read', () => ({ deny: 'ENOENT' }))
   on('ui.toast', ($, e) => {
     toasts.push(e.text)
@@ -71,7 +107,7 @@ function worldOf(on: On, runs: { current: Recorded } = { current: RUNS }) {
     return { value: await replayOf(runs.current).run(argv, (init ?? {}) as never) }
   }
 
-  return { clock, prompts, notices, toasts }
+  return { clock, prompts, notices, toasts, store }
 }
 
 async function settled(clock: MockClock): Promise<void> {
@@ -346,6 +382,208 @@ describe('wake-ups and notifications', () => {
     expect(prompts).toHaveLength(1)
   })
 })
+
+describe('across sessions', () => {
+  test('a session that ends with the radar open saves it as it stands', async ($, on) => {
+    const { clock, store } = worldOf(on)
+    const opened = $.tool.call({ tool: TOOL, action: 'open', wake: ['ready'] } as never)
+
+    await settled(clock)
+    await opened
+
+    // Saved as it opens, so a process that dies still comes back with it
+    expect(store.get('resume:session-a')).toMatchObject({ radar: { root: '/work', base: null, wake: ['ready'] }, compact: false })
+
+    const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
+
+    await ui.press({ key: 'compact' })
+    await settled(clock)
+    await ui.unmount()
+
+    const noted = $.tool.call({ tool: TOOL, action: 'note', branch: 'feat/conflict', text: 'handed back to b-7c' } as never)
+
+    await settled(clock)
+    await noted
+    await $.tool.call({ tool: TOOL, action: 'status', text: 'release v0.4.1 pending' } as never)
+    await $.session.end(endOf('prompt_input_exit'))
+
+    expect(store.get('resume:session-a')).toMatchObject({
+      radar: { root: '/work', base: null, wake: ['ready'] },
+      compact: true,
+      status: 'release v0.4.1 pending',
+      notes: { 'feat/conflict': { sha: tipOf('feat/conflict'), text: 'handed back to b-7c' } },
+    })
+  })
+
+  test('a resumed session, in a new process, opens the radar as it was left', async ($, on) => {
+    const { clock, store } = worldOf(on, undefined, { 'resume:session-a': leftOpen() })
+
+    // A new process: the session state is empty, the store is kept
+    expect(await bandText($)).toEqual([])
+
+    await $.session.start(START)
+    await settled(clock)
+
+    const compact = await bandText($)
+
+    expect(compact.some(text => /^work \[main\] · 4 ready .* · land next → feat\/parent$/.test(text))).toBe(true)
+    expect(compact.some(text => /^ 1 feat\/parent/.test(text))).toBe(false)
+
+    const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
+
+    await ui.press({ key: 'compact' })
+    await settled(clock)
+    await ui.unmount()
+
+    const expanded = await bandText($)
+
+    expect(expanded.some(text => /feat\/conflict\s+needs rebase.*handed back to b-7c/.test(text))).toBe(true)
+    expect(expanded.some(text => /land next → feat\/parent +release v0\.4\.1 pending$/.test(text))).toBe(true)
+    // The caller's wakes came back with it, and it answers the caller
+    expect(store.get('resume:session-a')).toMatchObject({ radar: { wake: ['ready'] } })
+    expect(JSON.parse(String((await $.tool.call({ tool: TOOL, action: 'snapshot' } as never)).result)).next).toBe('feat/parent')
+  })
+
+  test('a new session leaves it closed: another session left it open', async ($, on) => {
+    const { clock } = worldOf(on, undefined, { 'resume:session-b': leftOpen() })
+
+    await $.session.start(START)
+    await settled(clock)
+
+    expect(await bandText($)).toEqual([])
+  })
+
+  test('a run with no person at the prompt leaves it closed', async ($, on) => {
+    const { clock } = worldOf(on, undefined, { 'resume:session-a': leftOpen() })
+
+    await $.session.start({ cwd: '/work', surface: null, isInteractive: false })
+    await settled(clock)
+
+    expect(await bandText($)).toEqual([])
+  })
+
+  test('closing it forgets it, and a closed radar saves nothing', async ($, on) => {
+    const { clock, store } = worldOf(on)
+
+    await $.command.run(RADAR)
+    await settled(clock)
+
+    expect(store.has('resume:session-a')).toBe(true)
+
+    await $.command.run(RADAR)
+    await settled(clock)
+    await $.session.end(endOf('prompt_input_exit'))
+
+    expect(store.has('resume:session-a')).toBe(false)
+  })
+
+  test('/clear keeps it open, without the wakes the cleared conversation asked for', async ($, on) => {
+    const { clock, store } = worldOf(on)
+
+    await $.session.start(START)
+
+    const opened = $.tool.call({ tool: TOOL, action: 'open', wake: ['ready'] } as never)
+
+    await settled(clock)
+    await opened
+    await $.session.end(endOf('clear'))
+    await $.classic.SessionStart({ source: 'clear', session_id: 'session-c' })
+    await settled(clock)
+
+    expect((await bandText($)).some(text => text.endsWith('land next → feat/parent'))).toBe(true)
+    // The cleared conversation keeps its own, for a resume of it
+    expect(store.get('resume:session-a')).toMatchObject({ radar: { wake: ['ready'] } })
+    expect(store.get('resume:session-c')).toMatchObject({ radar: { root: '/work', wake: [] } })
+  })
+
+  test('/resume brings back what the resumed conversation left, or closes it', async ($, on) => {
+    const { clock, store } = worldOf(on, undefined, { 'resume:session-b': leftOpen() })
+
+    await $.session.start(START)
+    await $.command.run(RADAR)
+    await settled(clock)
+    await $.session.end(endOf('resume'))
+    await $.classic.SessionStart({ source: 'resume', session_id: 'session-b' })
+    await settled(clock)
+
+    // Folded, as session-b left it; session-a's stays saved for its resume
+    expect((await bandText($)).some(text => /^work \[main\] · 4 ready .* · land next → feat\/parent$/.test(text))).toBe(true)
+    expect(store.get('resume:session-a')).toMatchObject({ radar: { root: '/work', wake: [] }, compact: false })
+
+    await $.session.end(endOf('resume', 'session-b'))
+    await $.classic.SessionStart({ source: 'resume', session_id: 'session-x' })
+    await settled(clock)
+
+    expect(await bandText($)).toEqual([])
+  })
+
+  test('/branch carries it on whole', async ($, on) => {
+    const { clock, store } = worldOf(on)
+
+    await $.session.start(START)
+
+    const opened = $.tool.call({ tool: TOOL, action: 'open', wake: ['ready'] } as never)
+
+    await settled(clock)
+    await opened
+    await $.session.end(endOf('resume'))
+    await $.classic.SessionStart({ source: 'fork', session_id: 'session-d' })
+    await settled(clock)
+
+    expect((await bandText($)).some(text => text.endsWith('land next → feat/parent'))).toBe(true)
+    expect(store.get('resume:session-d')).toMatchObject({ radar: { root: '/work', wake: ['ready'] } })
+  })
+
+  test('keeps the sessions saved last, up to the limit', async ($, on) => {
+    const older = Object.fromEntries(
+      Array.from({ length: Limits.SAVED_SESSIONS }, (_, index) => [`resume:old-${index}`, leftOpen(NOW - 1_000_000 + index)]),
+    )
+    const { clock, store } = worldOf(on, undefined, older)
+
+    await $.command.run(RADAR)
+    await settled(clock)
+
+    expect([...store.keys()].filter(key => key.startsWith('resume:'))).toHaveLength(Limits.SAVED_SESSIONS)
+    expect(store.has('resume:old-0')).toBe(false)
+    expect(store.has('resume:old-1')).toBe(true)
+    expect(store.has('resume:session-a')).toBe(true)
+  })
+})
+
+/**
+ * What `session.end` brings when a session ends.
+ *
+ * @param reason why it ends
+ * @param sessionId the session ending
+ */
+function endOf(reason: 'clear' | 'resume' | 'prompt_input_exit', sessionId = SESSION) {
+  return { reason, sessionId, resume: { id: sessionId } } as const
+}
+
+/**
+ * A branch's tip, as the recording's branch list has it.
+ */
+function tipOf(branch: string): string {
+  const heads = Object.entries(RUNS).find(([key]) => key.includes('"for-each-ref"'))?.[1].stdout ?? ''
+  const line = heads.split('\n').find(entry => entry.startsWith(`refs/heads/${branch}\u0000`))
+
+  return line?.split('\u0000')[1] ?? ''
+}
+
+/**
+ * A radar a session left open, as the store keeps it: folded, a caller's
+ * wakes, line and note.
+ */
+function leftOpen(savedAt = NOW) {
+  return {
+    radar: { root: '/work', base: null, wake: ['ready'] },
+    compact: true,
+    status: 'release v0.4.1 pending',
+    notes: { 'feat/conflict': { sha: tipOf('feat/conflict'), text: 'handed back to b-7c' } },
+    dueMarks: {},
+    savedAt,
+  }
+}
 
 /**
  * The recording with feat/ready-a's worktree-less branch shown as dirty:

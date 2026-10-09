@@ -9,13 +9,16 @@ import Limits from './limits'
 import { BAND_TITLE, COMMAND_DESCRIPTION, COMMAND_HINT } from './names'
 import { createRadar, type Radar } from './radar'
 import { bandLinesOf, controlsOf, frameOf } from './rows'
+import { forgetRadar, keepRadar, loadRadar, pruneSaved, saveRadar, savedRadarOf, type SavedRadar } from './saved'
 import { clipChars, messageOf, sanitize } from './text'
 import { TOOL_DESCRIPTION, TOOL_INPUT_SCHEMA, toolJsonOf, toolRequestOf } from './tool'
 import { bandView } from './view'
 
 /**
  * The radar's session state. The band draws from it, so every write
- * redraws the band; a reload of the module keeps it.
+ * redraws the band; a reload of the module keeps it. A new process starts
+ * without it, and `/clear`, `/resume` and `/branch` reset it: an open radar
+ * is also saved in the store for the session's resume (saved.ts).
  */
 const RADAR = atom({ plugin: 'worktree-radar', key: 'radar' } as const, null)
 const SNAPSHOT = atom({ plugin: 'worktree-radar', key: 'snapshot' } as const, null)
@@ -51,6 +54,7 @@ function optionsOf(options: PluginOptions): RadarOptions {
 function hostOf($: EngineInterface, options: RadarOptions): Host {
   return {
     cwd: () => $.session.cwd(),
+    sessionId: () => $.session.id(),
     run: (argv, init) => $.process.run(argv, init),
     readText: path => $.fs.read(path).then(
       text => text,
@@ -69,6 +73,8 @@ function hostOf($: EngineInterface, options: RadarOptions): Host {
     store: {
       get: key => $.store.get(key),
       set: (key, value) => $.store.set(key, value),
+      delete: key => $.store.delete(key),
+      keys: () => $.store.keys(),
     },
     state: {
       radar: {
@@ -126,7 +132,9 @@ function hostOf($: EngineInterface, options: RadarOptions): Host {
 
 /**
  * Opens the radar on a folder, replacing one open before, and starts its
- * polls; the first read follows at once.
+ * polls; the first read follows at once. It is saved for the session's
+ * resume as it opens: a process that dies without ending the session still
+ * comes back with it.
  *
  * @param host the engine's calls
  * @param radar the radar's polls and reads
@@ -138,16 +146,78 @@ async function openRadar(host: Host, radar: Radar, config: RadarConfig): Promise
   await host.state.radar.set(() => config)
   await host.state.snapshot.set(() => null)
   await host.state.problem.set(() => null)
+
+  try {
+    const sessionId = await host.sessionId()
+
+    await keepRadar(host, sessionId)
+    void pruneSaved(host, sessionId).catch(() => undefined)
+  } catch {
+    // It opens all the same, and is saved when the session ends
+  }
+
   await radar.start(host)
 }
 
-async function closeRadar(host: Host, radar: Radar): Promise<void> {
+/**
+ * Stops the radar and empties the state the band draws from.
+ */
+async function clearRadar(host: Host, radar: Radar): Promise<void> {
   radar.stop()
   await host.state.radar.set(() => null)
   await host.state.snapshot.set(() => null)
   await host.state.problem.set(() => null)
   await host.state.status.set(() => null)
   await host.state.helpShown.set(() => false)
+}
+
+/**
+ * Closes the radar, and drops what the session saved for its resume.
+ */
+async function closeRadar(host: Host, radar: Radar): Promise<void> {
+  await clearRadar(host, radar)
+
+  try {
+    await forgetRadar(host, await host.sessionId())
+  } catch {
+    // A resume would open it again: closed, it stays closed in this session
+  }
+}
+
+/**
+ * Opens a radar a session left, as it was left, and saves it for this
+ * session; with none, the radar is closed. Called where the state starts
+ * over: a new process, `/clear`, `/resume` and `/branch`.
+ *
+ * @param host the engine's calls
+ * @param radar the radar's polls and reads
+ * @param saved what the session left, or null
+ * @param sessionId the session it opens in: the conversation on screen
+ */
+async function reopenRadar(host: Host, radar: Radar, saved: SavedRadar | null, sessionId: string): Promise<void> {
+  radar.stop()
+
+  if (saved === null) {
+    // The engine reset the state already; an open radar left here would be
+    // another conversation's
+    if ((await host.state.radar.get()) !== null) {
+      await clearRadar(host, radar)
+    }
+
+    return
+  }
+
+  await host.state.compact.set(() => saved.compact)
+  await host.state.status.set(() => saved.status)
+  await host.state.notes.set(() => ({ ...saved.notes }))
+  await host.state.dueMarks.set(() => ({ ...saved.dueMarks }))
+  await host.state.helpShown.set(() => false)
+  await host.state.snapshot.set(() => null)
+  await host.state.problem.set(() => null)
+  // Last, so the band's first drawing has the rest
+  await host.state.radar.set(() => saved.radar)
+  await saveRadar(host, sessionId, { ...saved, savedAt: await host.now() }).catch(() => undefined)
+  void radar.start(host).catch(() => undefined)
 }
 
 /**
@@ -171,8 +241,21 @@ async function answerOf(host: Host): Promise<{ result: string } | { deny: string
 export const register: Register = (on, pluginOptions) => {
   const options = optionsOf(pluginOptions)
   const radar = createRadar()
+  /**
+   * Whether `session.start` ran for this module: at a process's start
+   * `classic.SessionStart` fires before it, and `session.start` opens what a
+   * resumed session left.
+   */
+  let hasStarted = false
+  /**
+   * The radar the session that just ended had open, for the conversation
+   * that follows it in this process (`/clear`, `/branch`).
+   */
+  let ended: SavedRadar | null = null
 
   on('session.start', async ($, e, next) => {
+    hasStarted = true
+
     try {
       await $.command.register({
         name: 'radar',
@@ -196,11 +279,68 @@ export const register: Register = (on, pluginOptions) => {
     }
 
     // A reload of the module cancels its timers but keeps the state: an
-    // open radar polls again
+    // open radar polls again. A new process starts with no state: a resumed
+    // session (`claude --continue`, `--resume`) opens the radar it left open
     const host = hostOf($, options)
 
     if ((await host.state.radar.get()) !== null) {
       void radar.start(host).catch(() => undefined)
+    } else if (e.isInteractive) {
+      void host
+        .sessionId()
+        .then(async sessionId => reopenRadar(host, radar, await loadRadar(host, sessionId), sessionId))
+        .catch(() => undefined)
+    }
+
+    return next(e)
+  })
+
+  /**
+   * `/clear`, `/resume` and `/branch` (`fork`) reset the session state, and
+   * the conversation goes on under another session id, `e.session_id`
+   * (`$.session.id()` still answers the old one here). The resumed
+   * conversation gets the radar it left, or none; `/branch` carries the
+   * radar on whole, and `/clear` without its caller's wake list: the wakes
+   * were asked for by the conversation it cleared.
+   */
+  on('classic.SessionStart', { source: ['clear', 'resume', 'fork'] }, async ($, e, next) => {
+    const carried = ended
+
+    ended = null
+
+    if (hasStarted) {
+      const host = hostOf($, options)
+      const saved =
+        e.source === 'resume'
+          ? await loadRadar(host, e.session_id)
+          : e.source === 'clear' && carried !== null
+            ? { ...carried, radar: { ...carried.radar, wake: [] } }
+            : carried
+
+      await reopenRadar(host, radar, saved, e.session_id)
+    }
+
+    return next(e)
+  }).catch(($, e, next) => next(e))
+
+  /**
+   * The session ends: an exit, `/clear`, `/resume` or `/branch`. An open
+   * radar is saved under its id as it stands, for a resume, and kept for the
+   * conversation that follows in this process. A closed one writes nothing.
+   */
+  on('session.end', async ($, e, next) => {
+    const host = hostOf($, options)
+
+    ended = null
+
+    try {
+      ended = await savedRadarOf(host)
+
+      if (ended !== null) {
+        await saveRadar(host, e.sessionId, ended)
+      }
+    } catch {
+      // It comes back as it was when it opened
     }
 
     return next(e)

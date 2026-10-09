@@ -69,6 +69,20 @@ hides the band (Ctrl+X Ctrl+A), and a mod cannot move it into the frame. It upda
 branch tips, the worktrees and the running Claude sessions, and reads the
 repository again once a change has settled.
 
+### Across sessions
+
+The radar belongs to the conversation it was opened in:
+
+| You | The radar |
+|---|---|
+| resume a session: `claude --continue`, `claude --resume`, `/resume` | comes back as that session left it: open or closed, folded or not, with a skill's wake list, status line and notes |
+| start a new session | stays closed |
+| `/clear` | stays as it was, but wakes nothing until a skill opens it again: the wakes were asked for by the conversation you cleared |
+| `/branch` | stays as it was in the branch, wake list and all |
+| `claude --resume <id> --fork-session` | stays closed: Claude Code does not tell a mod which session the fork came from |
+
+The last 50 sessions that ended with the radar open are remembered.
+
 ### The lanes
 
 | Lane | Meaning |
@@ -132,8 +146,8 @@ Everything stays on your machine. The radar runs `git` in your repository
 (reads, plus the in-memory merges of `git merge-tree` and `git commit-tree`,
 whose unreferenced objects `git gc` prunes; no ref, index or worktree is
 touched) and `claude agents --json` to see which sessions work where. It
-sends nothing anywhere. Holds are kept in Claude Code's plugin store on this
-machine.
+sends nothing anywhere. Holds, and the radar each session left open, are kept
+in Claude Code's plugin store on this machine.
 
 ## Develop
 

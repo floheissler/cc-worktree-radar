@@ -37,11 +37,15 @@ work on the next item.
 - `types/index.d.ts`: the snapshot's types (the tool's JSON contract) and
   the `$.state` contract (`PluginState['worktree-radar']`).
 - `hooks/register.tsx`: the hooks and the only file that touches `$`:
-  `/radar`, the `radar` tool, the `AbovePrompt` band, `session.start`.
+  `/radar`, the `radar` tool, the `AbovePrompt` band, `session.start`,
+  `classic.SessionStart` and `session.end`.
 - `hooks/host.ts`: the `Host` record the rest of the code takes instead of
   `$`, and the person's settings (`RadarOptions`).
 - `hooks/radar.ts`: the radar at work while open: polls, reads, holds and
   notes, and what a read tells the session (wake prompts, notifications).
+- `hooks/saved.ts`: the radar a session left open, kept in the store for
+  its resume: the record, its checked reading, the save, the forget and
+  the cap.
 - `hooks/analysis.ts`: the read itself, ported from the owner's private
   `merge-pipeline` script (`pipeline.py snapshot`): lanes, simulated merges,
   stacking, knock-on conflicts, READY's ranking, the rebase order, and each
@@ -63,7 +67,8 @@ work on the next item.
   of every git run of one read of a real test repository (paths rewritten to
   `/work`), checked against `pipeline.py`'s own answers; `replay.ts` answers
   git from it. `band.test.ts` mounts the band and drives `/radar` and the
-  tool through the engine.
+  tool through the engine, and sessions ending, starting and resuming over
+  a store it reads.
 
 ## Rules the engine's static scan enforces
 
@@ -108,6 +113,23 @@ the module otherwise:
   folder (`folderKeyOf`), one key per repository, so every worktree and
   session of it sees the same holds. What the store holds is checked
   (`holdsIn`).
+- The radar belongs to its conversation. `$.state` dies with the process
+  and `/clear`, `/resume`, `/branch` reset it, so an open radar is also kept
+  in `$.store` under `resume:` and the session's id (`saved.ts`), one key per
+  session: saved at open (`openRadar`, so a process that dies still
+  resumes it) and as it stands at `session.end` (the config with the
+  caller's wake list, `compact`, `status`, `notes`, `dueMarks`; not the read,
+  not the help); a close forgets it, a closed radar writes nothing.
+  `session.start` in an interactive new process reopens what its
+  `$.session.id()` left (`claude --continue`, `--resume`). In the process,
+  `classic.SessionStart` reopens: `resume` what `e.session_id` left, or
+  nothing; `clear` and `fork` (`/branch`) carry on what `session.end` just
+  read (`ended`), `clear` without the wake list, which the cleared
+  conversation asked for. At a process's start that hook fires before
+  `session.start` and stands aside (`hasStarted`). An open's save drops the
+  oldest past `SAVED_SESSIONS` (`pruneSaved`); what the store holds is
+  checked (`savedRadarIn`). A `--fork-session` start comes back closed: no
+  API names the session it forked.
 - The tool hook matches its tool by a pattern (`/^mcp__worktree-radar__radar$/`):
   the laid MCP types do not list a plugin's own tool, so a literal fails
   `tsc`.
@@ -152,6 +174,32 @@ the module otherwise:
   alone, `next →` first so a narrow band cuts the counts, not it. A hotkey
   works only while the band has the keyboard (Ctrl+X Tab, a click); no digit
   hotkeys, as a bare digit in an empty prompt presses a band Button.
+
+## Sessions, resumes and resets
+
+Checked live on Claude Code 2.1.295 (2026-10-09) with a probe mod logging
+every step, in tmux on a throwaway repository.
+
+- A new process (`claude`, `-c`, `--resume <id>`, `--resume` and its
+  picker, `--fork-session`) fires `classic.SessionStart` (`startup`,
+  `resume` or `fork`) about 0.5 s before `session.start`; both already see
+  the session's id. `-c` and `--resume` keep the resumed session's own id;
+  `--fork-session` gets a new one, and the session it forked is named only
+  in the transcript file (`forkedFrom`), which no API reads. `$.state`
+  starts empty.
+- `/clear`: `session.end` (`clear`, the old id, `$.state` still readable),
+  then `classic.SessionStart` (`clear`, the new id; `$.state` reset). No
+  `session.start`.
+- `/resume`: `session.end` (`resume`), then `classic.SessionStart`
+  (`resume`) whose `e.session_id` is the resumed id while `$.session.id()`
+  still answers the old one; it has caught up by the next command.
+  `/branch` is the same with `fork` and a new id.
+- `$.store.get` on a key never set creates no store file. A `--plugin-dir`
+  copy keeps its own (`worktree-radar_inline-….json`): delete it after a
+  probe.
+- A `ready` wake reached a resumed session (`-c`) after a branch appeared,
+  so the wake list travels with the save. Haiku in auto mode then merged
+  the branch on its own: what a woken model does is the caller's business.
 
 ## Carried over from cc-file-explorer
 

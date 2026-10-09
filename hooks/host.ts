@@ -53,6 +53,11 @@ export type Host = {
    */
   readonly cwd: () => Promise<string>
   /**
+   * The session's id: what `claude --resume` returns to, and the key of the
+   * radar it left open.
+   */
+  readonly sessionId: () => Promise<string>
+  /**
    * Runs a program by its argument vector, no shell: git, and
    * `claude agents --json` for the sessions.
    */
@@ -81,11 +86,14 @@ export type Host = {
   readonly submit: (text: string) => Promise<void>
   /**
    * The plugin's store, kept between sessions and shared by every session on
-   * the machine: the holds, per repository.
+   * the machine: the holds, per repository, and the radar each session left
+   * open, per session.
    */
   readonly store: {
     readonly get: (key: string) => Promise<unknown>
     readonly set: (key: string, value: unknown) => Promise<void>
+    readonly delete: (key: string) => Promise<void>
+    readonly keys: () => Promise<string[]>
   }
   readonly state: RadarState
   readonly options: RadarOptions
