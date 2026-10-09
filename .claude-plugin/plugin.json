@@ -18,5 +18,6 @@
     "parallel",
     "sessions",
     "mod"
-  ]
+  ],
+  "types": "./types/index.d.ts"
 }
