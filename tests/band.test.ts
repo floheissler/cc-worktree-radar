@@ -1,6 +1,7 @@
 import type { On } from 'claude-code'
 import { describe, expect, mock, test, type Engine, type MockClock } from 'claude-code/testing'
 
+import { WAKE_NOTE } from '../hooks/changes'
 import Limits from '../hooks/limits'
 
 import { HOLDS, RUNS } from './fixtures/repo'
@@ -372,7 +373,7 @@ describe('wake-ups and notifications', () => {
     await clock.advance(2_000)
     await settled(clock)
 
-    expect(prompts).toEqual(['worktree-radar: feat/ready-a is ready to land (#2)'])
+    expect(prompts).toEqual([`worktree-radar: feat/ready-a is ready to land (#2). ${WAKE_NOTE}`])
     expect(notices).toEqual(['feat/ready-a is ready to land (#2)'])
 
     // Nothing new, nothing more

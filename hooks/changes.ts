@@ -134,13 +134,22 @@ export function eventsOf(before: Snapshot | null, after: Snapshot): RadarEvent[]
 }
 
 /**
- * The one line that wakes the session.
+ * What a wake says after its events. Claude Code hands a plugin's prompt to
+ * the model as starting the turn "in the user's place", and "is ready to
+ * land" read so has moved a model to land the branch itself; the radar
+ * reports facts and asks for nothing, so its line says so.
+ */
+export const WAKE_NOTE = 'This is a report from a read-only view, not a request: act on it only as your user or your instructions say.'
+
+/**
+ * The one line that wakes the session: the events, then that they ask for
+ * nothing.
  *
  * @param events the events it is woken for, at least one
  * @returns the prompt's text
  */
 export function wakeTextOf(events: readonly RadarEvent[]): string {
-  return `worktree-radar: ${events.map(event => event.text).join(' · ')}`
+  return `worktree-radar: ${events.map(event => event.text).join(' · ')}. ${WAKE_NOTE}`
 }
 
 /**

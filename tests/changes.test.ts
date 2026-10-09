@@ -3,7 +3,7 @@ import { describe, expect, test } from 'claude-code/testing'
 import type { BranchInfo, Snapshot } from '../types'
 
 import { readSnapshot } from '../hooks/analysis'
-import { dueMarksOf, eventsOf, wakeEventsOf, wakeTextOf } from '../hooks/changes'
+import { dueMarksOf, eventsOf, WAKE_NOTE, wakeEventsOf, wakeTextOf } from '../hooks/changes'
 import { gitOf } from '../hooks/git'
 import { HOLDS } from './fixtures/repo'
 import { replayOf } from './replay'
@@ -111,7 +111,7 @@ describe('events between two reads', () => {
     const after = await fixtureSnapshot()
     const events = eventsOf(withBranch(after, 'feat/ready-a', { lane: 'HOLD' }), after)
 
-    expect(wakeTextOf(events)).toBe('worktree-radar: feat/ready-a is ready to land (#2)')
+    expect(wakeTextOf(events)).toBe(`worktree-radar: feat/ready-a is ready to land (#2). ${WAKE_NOTE}`)
   })
 })
 

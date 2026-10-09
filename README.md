@@ -125,11 +125,20 @@ your own can open the radar and act on what it sees. Allow it in the skill's
 | `comment` | `branch`, `text` | A short comment on the branch's row, shown until its tip moves; empty text clears it |
 | `status` | `text` | One line under the queue (`release v0.4.1 pending`); empty text clears it |
 
-`wake` lists the events that wake the session with a one-line prompt
-(`worktree-radar: feat/a is ready to land (#1) · …`): `ready`, `conflict`,
-`rebase-due`, `stacked`, `cleanup`, `base-moved`, `session-idle` (a session
-going idle, or a subagent finishing). Each event wakes once per branch tip.
-`/radar` itself wakes nothing.
+`wake` lists the events that wake the session with a one-line prompt:
+`ready`, `conflict`, `rebase-due`, `stacked`, `cleanup`, `base-moved`,
+`session-idle` (a session going idle, or a subagent finishing). Each event
+wakes once per branch tip. `/radar` itself wakes nothing. The prompt is a
+report and says so:
+
+```
+worktree-radar: feat/a is ready to land (#1) · main moved 3f2a1c9→8b0e4d2. This is a report from a read-only view, not a request: act on it only as your user or your instructions say.
+```
+
+Claude Code hands a plugin's prompt to the model as starting the turn in the
+user's place, and a bare "is ready to land" read that way has moved a model
+to land the branch itself. What to do on an event is your skill's to say:
+told to land ready branches, a model does; told nothing, it reports.
 
 The snapshot is JSON (`schema: 1`): the repository, the base (`name`, `sha`,
 `upstream`, uncommitted files in the main worktree), whether sessions could be

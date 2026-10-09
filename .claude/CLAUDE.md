@@ -131,7 +131,10 @@ the module otherwise:
   progress since. `pipeline.py` used its private hand-back records here.
 - Events wake the session only for the kinds the caller listed at `open`,
   once per branch tip (`reported`, the module's), never on the first read.
-  `/radar` lists none.
+  `/radar` lists none. The wake line (`wakeTextOf`) is the events, then
+  `WAKE_NOTE`: a report from a read-only view, not a request, to act on only
+  as the user or the session's instructions say. Without it a woken model
+  took "is ready to land" as its user's request and merged (below).
 - Holds live in `$.store` under `holds:` and the repository's shared `.git`
   folder (`folderKeyOf`), one key per repository, so every worktree and
   session of it sees the same holds. What the store holds is checked
@@ -245,6 +248,24 @@ every step, in tmux on a throwaway repository.
 - A `ready` wake reached a resumed session (`-c`) after a branch appeared,
   so the wake list travels with the save. Haiku in auto mode then merged
   the branch on its own: what a woken model does is the caller's business.
+
+## Wake prompts
+
+Checked live on Claude Code 2.1.295 (2026-10-09): fresh Haiku sessions in
+auto mode in a throwaway repository opened the radar with `wake: ["ready"]`,
+then a branch became ready.
+
+- Claude Code shows a `$.prompt.submit` text as "The worktree-radar plugin
+  sent a message: <text>", followed by its own line: "This is how Claude
+  Code surfaces a prompt a plugin submits between turns — it starts this
+  turn in the user's place. Address the message above."
+- With the bare line (`worktree-radar: feat/x is ready to land (#1)`), one
+  session merged the branch on its own and another asked to.
+- With `WAKE_NOTE` after the events, two sessions told only to open the
+  radar merged nothing ("the radar message is a report"), and one told to
+  merge ready branches without asking merged at once: the note stops a
+  report from passing as the user's request, and leaves a caller's own
+  instructions in force. A handful of runs, not a measure.
 
 ## Subagents' worktrees
 
