@@ -118,6 +118,13 @@ export const WIDE_COLUMNS = 64
 export const MEDIUM_COLUMNS = 40
 
 /**
+ * The columns after the lane: commits ahead (`  +3`) and the age of the last
+ * commit (`  25m`), each right-aligned.
+ */
+const AHEAD_CELLS = 4
+const AGE_CELLS = 5
+
+/**
  * One of the header's controls, drawn as its hotkey, a colon and its label
  * (`h: help`).
  */
@@ -371,14 +378,14 @@ export function rowOf(branch: BranchInfo, base: string, columns: number, branchC
   ]
 
   if (isWide) {
-    segments.push({ text: (branch.ahead > 0 ? `+${branch.ahead}` : '').padStart(4), dim: true })
+    segments.push({ text: (branch.ahead > 0 ? `+${branch.ahead}` : '').padStart(AHEAD_CELLS), dim: true })
   }
 
+  // The age of a branch with work of its own, beside what it has ahead
   if (isMedium) {
-    const note = noteOf(branch, base)
-    const age = branch.ahead > 0 ? [{ text: ' · ', dim: true }, { text: ageOf(nowSeconds - branch.lastCommitAt), dim: true }] : []
+    const age = branch.ahead > 0 ? ageOf(nowSeconds - branch.lastCommitAt) : ''
 
-    segments.push({ text: '  ' }, ...note, ...(note.length > 0 ? age : age.slice(1)))
+    segments.push({ text: age.padStart(AGE_CELLS), dim: true }, { text: '  ' }, ...noteOf(branch, base))
   }
 
   return { key: `row:${branch.name}`, segments: fitSegments(segments, columns) }
@@ -395,7 +402,8 @@ export function rowOf(branch: BranchInfo, base: string, columns: number, branchC
 export function branchCellsOf(branches: readonly BranchInfo[], columns: number): number {
   const longest = Math.max(6, ...branches.map(branch => cellWidth(sanitize(branch.name))))
   const share = columns >= WIDE_COLUMNS ? 0.4 : columns >= MEDIUM_COLUMNS ? 0.45 : 0.5
-  const fixed = 3 + 2 + (columns >= WIDE_COLUMNS ? 16 : 6)
+  const labelCells = columns >= WIDE_COLUMNS ? 12 : 6
+  const fixed = 3 + 2 + labelCells + (columns >= WIDE_COLUMNS ? AHEAD_CELLS : 0) + (columns >= MEDIUM_COLUMNS ? AGE_CELLS : 0)
 
   return Math.max(1, Math.min(longest, Math.floor(columns * share), columns - fixed))
 }
@@ -652,12 +660,12 @@ export function helpLinesOf(base: string, columns: number): Line[] {
       entries: [
         { term: { text: '1 2 3' , bold: true }, meaning: `the order to land the ready branches in: stack parents first, then whichever forces the least rebase work on the others, then whichever finished first` },
         { term: { text: '+3' }, meaning: `commits the branch has that ${onto} lacks` },
+        { term: { text: '5m' }, meaning: 'since its last commit' },
         { term: { text: 'rebase due', color: 'error' }, meaning: 'rebase it now: nothing that lands before it still conflicts with it' },
         { term: { text: 'rebase after X' }, meaning: 'X lands first and conflicts with it too; a rebase now would have to be done again' },
         { term: { text: 'forces a rebase of X' }, meaning: 'landing this branch makes X conflict' },
         { term: { text: 'X stacked on it' }, meaning: 'X holds this branch: this one lands first' },
         { term: { text: `landed in ${onto}` }, meaning: `its work reached ${onto} through a merge` },
-        { term: { text: '5m' }, meaning: 'since its last commit' },
       ],
     },
     {

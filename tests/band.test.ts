@@ -253,7 +253,7 @@ describe('/radar', () => {
 
     const texts = await bandText($)
 
-    expect(texts.some(text => /^ - feat\/parent\s+on hold\s+\+1  needs a review/.test(text))).toBe(true)
+    expect(texts.some(text => /^ - feat\/parent\s+on hold\s+\+1 +\d+[smhd]  needs a review/.test(text))).toBe(true)
     expect(texts).toContain('next → feat/ready-a')
     expect(toasts).toEqual(['Holding feat/parent'])
 

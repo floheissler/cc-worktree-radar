@@ -69,8 +69,9 @@ describe('the band laid out', () => {
       'row:chore/merged',
       'foot',
     ])
-    expect(textOf(lines[1])).toMatch(/^ 1 feat\/parent\s+ready\s+\+1  feat\/child stacked on it · merges cleanly · \d+[smhd]$/)
-    expect(textOf(lines[5])).toMatch(/^ - feat\/conflict2\s+needs rebase\s+\+1  conflicts: a\.txt · rebase after feat\/ready-a/)
+    expect(textOf(lines[1])).toMatch(/^ 1 feat\/parent\s+ready\s+\+1 +\d+[smhd]  feat\/child stacked on it · merges cleanly$/)
+    expect(textOf(lines[5])).toMatch(/^ - feat\/conflict2\s+needs rebase\s+\+1 +\d+[smhd]  conflicts: a\.txt · rebase after feat\/ready-a/)
+    expect(textOf(lines.find(line => line.key === 'row:chore/merged'))).toMatch(/^ - chore\/merged\s+cleanup {16}nothing beyond main$/)
     expect(textOf(lines.at(-1))).toBe('next → feat/parent')
   })
 
@@ -101,7 +102,7 @@ describe('the band laid out', () => {
   test('narrows: the commits ahead go first, then the notes', async () => {
     const snapshot = await fixtureSnapshot()
 
-    expect(textOf(bandLinesOf(modelOf(snapshot, { columns: 50 }))[1])).toMatch(/^ 1 feat\/parent\s+ready\s+feat\/child/)
+    expect(textOf(bandLinesOf(modelOf(snapshot, { columns: 50 }))[1])).toMatch(/^ 1 feat\/parent\s+ready +\d+[smhd]  feat\/child/)
     expect(textOf(bandLinesOf(modelOf(snapshot, { columns: 30 }))[5])).toMatch(/^ - feat\/conflict2\s+rebase\s*$/)
   })
 
