@@ -209,7 +209,12 @@ the module otherwise:
   in `inactive` (light grey on a dark theme), cut inside its quotes. With a
   comment shown, DETAIL is as wide as its longest, up to `DETAIL_SHARE` of
   what the branch leaves, and COMMENT takes the rest, from
-  `COMMENT_MIN_CELLS`. The facts (branch, ahead, age, detail) are in the
+  `COMMENT_MIN_CELLS`. COMMENT reaches the row's end, under the header's
+  controls, so it is also at least as wide as the controls plus its name,
+  the detail giving up cells for that; with the detail left under
+  `DETAIL_MIN_CELLS`, the comments go. Seen live: a long branch name left a
+  26-cell comment column starting where the controls did, its name gone
+  from the header. The facts (branch, ahead, age, detail) are in the
   theme's text color; dim is for what is not data (the column names, the
   ` · ` separators, the `-` off the landing order, a folded lane's line),
   so the grey comment is the one quiet thing on a row. The detail was dim

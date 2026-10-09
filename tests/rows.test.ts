@@ -356,6 +356,41 @@ describe('the band laid out', () => {
     }
   })
 
+  test('a comment column always shows its name, clear of the controls', async () => {
+    const snapshot = await fixtureSnapshot()
+    const long = 'feat/ünïcödé-🌳-a-very-long-branch-name-that-goes-on-to-test-the-column-share'
+    const commented = (rename: boolean) => ({
+      ...snapshot,
+      branches: snapshot.branches.map(branch => ({
+        ...branch,
+        name: rename && branch.name === 'feat/parent' ? long : branch.name,
+        comment: branch.name === 'feat/conflict' ? 'handed to small-worker' : branch.comment,
+      })),
+    })
+    const cellsBefore = (text: string, mark: string) => cellWidth(text.slice(0, text.indexOf(mark)))
+
+    // Seen live: a 151-cell band, a long branch name; COMMENT went under the
+    // controls. The detail gives up cells instead
+    const lines = bandLinesOf(modelOf(commented(true), { columns: 151 }))
+    const row = textOf(lines.find(line => line.key === 'row:feat/conflict'))
+
+    expect(textOf(lines[0])).toMatch(/DETAIL +COMMENT$/)
+    expect(cellsBefore(row, '✻')).toBe(cellsBefore(textOf(lines[0]), 'COMMENT'))
+
+    for (let columns = 1; columns <= 200; columns += 1) {
+      for (const rename of [false, true]) {
+        const laid = bandLinesOf(modelOf(commented(rename), { columns }))
+        const shown = textOf(laid.find(line => line.key === 'row:feat/conflict'))
+
+        if (shown.includes('✻')) {
+          expect(cellsBefore(shown, '✻'), `at ${columns}`).toBe(cellsBefore(textOf(laid[0]), 'COMMENT'))
+        } else {
+          expect(textOf(laid[0]), `at ${columns}`).not.toContain('COMMENT')
+        }
+      }
+    }
+  })
+
   test('a cleanup row says it has a worktree, not where', async () => {
     const lines = bandLinesOf(modelOf(await fixtureSnapshot(), { columns: 160 }))
 

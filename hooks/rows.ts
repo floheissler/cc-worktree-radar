@@ -161,6 +161,12 @@ const DETAIL_MIN_CELLS = 6
 const COMMENT_MIN_CELLS = 16
 
 /**
+ * The comment column's name, which the header must show where the column
+ * starts: before the controls at the header's end.
+ */
+const COMMENT_NAME = 'COMMENT'
+
+/**
  * The base branch's color in the status line: xterm's orange 208, the one
  * the owner's own status line names the branch with, so the two agree. A
  * raw color, as no theme key holds it (`claude`, Claude's orange, marks a
@@ -201,12 +207,16 @@ export type TableColumns = {
  * Sizes the queue's columns to the band and the branches it shows. A
  * comment column comes only on a wide band, while a row shown has a
  * comment; the detail column is then as wide as its longest, up to its
- * share, and the comment takes the rest.
+ * share, and the comment takes the rest. The comment column reaches the
+ * row's end, under the header's controls: it is at least wide enough for
+ * its name to start before them, the detail giving up cells for that, and
+ * goes when the detail would be left too few.
  *
  * @param columns the cells a row may take
  * @param names the branches' names, sanitized
  * @param details the cells each shown branch's detail takes
  * @param isCommented whether a branch shown has a comment
+ * @param reserved the cells the controls take at the header's end
  * @returns the columns
  */
 export function tableColumnsOf(
@@ -214,6 +224,7 @@ export function tableColumnsOf(
   names: readonly string[],
   details: readonly number[] = [],
   isCommented = false,
+  reserved = 0,
 ): TableColumns {
   const shortLabel = Math.max(...Object.values(SHORT_LANE_LABELS).map(label => label.length))
   const longest = Math.max(BRANCH_MIN_CELLS, ...names.map(cellWidth))
@@ -225,9 +236,10 @@ export function tableColumnsOf(
 
     const branch = fit(left, BRANCH_SHARE.wide)
     const rest = left - branch
-    const detail = Math.min(Math.max(DETAIL_MIN_CELLS, ...details), Math.floor(rest * DETAIL_SHARE))
+    const least = Math.max(COMMENT_MIN_CELLS, reserved + COMMENT_NAME.length)
+    const detail = Math.min(Math.max(DETAIL_MIN_CELLS, ...details), Math.floor(rest * DETAIL_SHARE), rest - GAP_CELLS - least)
     const comment = rest - detail - GAP_CELLS
-    const isShown = isCommented && comment >= COMMENT_MIN_CELLS
+    const isShown = isCommented && detail >= DETAIL_MIN_CELLS && comment >= least
 
     return {
       branch,
@@ -296,7 +308,7 @@ export function columnHeaderOf(table: TableColumns, columns: number): Line {
   }
 
   if (table.comment > 0) {
-    groups.push([name(' '.repeat(GAP_CELLS)), name('COMMENT')])
+    groups.push([name(' '.repeat(GAP_CELLS)), name(COMMENT_NAME)])
   }
 
   // A column name is shown whole or not at all, never cut
@@ -924,6 +936,7 @@ export function bandLinesOf(model: BandModel): Line[] {
     shown.map(branch => sanitize(branch.name)),
     shown.map(branch => lineWidthOf({ key: '', segments: detailOf(branch, snapshot.base.name, ranks) })),
     shown.some(branch => branch.comment !== null && branch.comment !== ''),
+    columns - headerRoomOf(model, columns),
   )
   const body: Line[] = []
 
