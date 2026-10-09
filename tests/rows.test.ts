@@ -173,7 +173,8 @@ describe('the band laid out', () => {
       ].sort((a, b) => ['READY', 'NEEDS_REBASE', 'STACKED', 'IN_PROGRESS', 'HOLD', 'CLEANUP'].indexOf(a.lane) - ['READY', 'NEEDS_REBASE', 'STACKED', 'IN_PROGRESS', 'HOLD', 'CLEANUP'].indexOf(b.lane)),
     }
 
-    // Twelve rows into nine: cleanup and in progress fold, one line each
+    // Fourteen rows into nine: cleanup, in progress and needs rebase fold,
+    // one line each, so the band takes its 11 rows and no more
     const lines = bandLinesOf(modelOf(more, { maxRows: 11 }))
 
     expect(lines.map(line => line.key)).toEqual([
@@ -182,21 +183,69 @@ describe('the band laid out', () => {
       'row:feat/ready-a',
       'row:feat/big',
       'row:fix/small',
-      'row:feat/conflict2',
-      'row:feat/conflict',
+      'fold:NEEDS_REBASE',
       'row:feat/child',
       'fold:IN_PROGRESS',
       'row:feat/clean',
       'fold:CLEANUP',
       'foot',
     ])
-    expect(textOf(lines[8])).toBe('   in progress (3): feat/wip, feat/w2, feat/w3')
-    expect(textOf(lines[10])).toBe('   cleanup (3): chore/a, chore/b, chore/c')
+    expect(textOf(lines[5])).toBe('   needs rebase (2): feat/conflict2, feat/conflict')
+    expect(textOf(lines[7])).toBe('   in progress (3): feat/wip, feat/w2, feat/w3')
+    expect(textOf(lines[9])).toBe('   cleanup (3): chore/a, chore/b, chore/c')
 
-    // A lane of one branch never folds: it would take its row anyway
-    expect(bandLinesOf(modelOf(snapshot, { maxRows: 5 })).filter(line => line.key.startsWith('fold:')).map(line => line.key)).toEqual([
+    // A lane of one branch never folds: it would take its row anyway. Past
+    // the folds, the ready lane's tail folds behind its head
+    expect(bandLinesOf(modelOf(snapshot, { maxRows: 10 })).map(line => line.key)).toEqual([
+      'columns',
+      'row:feat/parent',
+      'row:feat/ready-a',
+      'fold:READY',
+      'fold:NEEDS_REBASE',
+      'row:feat/child',
+      'row:feat/wip',
+      'row:feat/clean',
       'fold:CLEANUP',
+      'foot',
     ])
+    expect(textOf(bandLinesOf(modelOf(snapshot, { maxRows: 10 }))[3])).toBe('   ready (+2): feat/big, fix/small')
+    // Shorter still, the lanes lowest in the order go; the foot stays
+    expect(bandLinesOf(modelOf(snapshot, { maxRows: 5 })).map(line => line.key)).toEqual([
+      'columns',
+      'row:feat/parent',
+      'fold:READY',
+      'fold:NEEDS_REBASE',
+      'foot',
+    ])
+  })
+
+  test('keeps the next to land and the foot however many branches it holds', async () => {
+    const snapshot = await fixtureSnapshot()
+    const ready = snapshot.branches.filter(branch => branch.lane === 'READY')
+    const many = {
+      ...snapshot,
+      branches: [
+        ...ready,
+        ...Array.from({ length: 26 }, (_, at) => ({ ...ready[1]!, name: `load/b${String(at + 1).padStart(2, '0')}`, rank: ready.length + at + 1 })),
+        ...snapshot.branches.filter(branch => branch.lane !== 'READY'),
+      ],
+    }
+
+    for (let maxRows = 1; maxRows <= 45; maxRows += 1) {
+      const lines = bandLinesOf(modelOf(many, { maxRows }))
+
+      // The column names, at least one row, the foot
+      expect(lines.length, `at ${maxRows} rows`).toBeLessThanOrEqual(Math.max(maxRows, 3))
+      expect(lines[1]?.key, `at ${maxRows} rows`).toBe('row:feat/parent')
+      expect(lines.at(-1)?.key, `at ${maxRows} rows`).toBe('foot')
+    }
+
+    // A 50-row terminal gives the band about 20: the first 9 ready, then the rest
+    const lines = bandLinesOf(modelOf(many, { maxRows: 18 }))
+
+    expect(lines.filter(line => line.key.startsWith('row:')).map(line => line.key).slice(0, 3)).toEqual(['row:feat/parent', 'row:feat/ready-a', 'row:feat/big'])
+    expect(textOf(lines.find(line => line.key === 'fold:READY'))).toMatch(/^ {3}ready \(\+\d+\): load\/b\d\d, /)
+    expect(textOf(lines.at(-1))).toMatch(/land next → feat\/parent$/)
   })
 
   test('the caller line, a dirty main worktree and a failed read go in the foot', async () => {

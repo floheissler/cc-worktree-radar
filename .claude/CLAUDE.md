@@ -173,6 +173,14 @@ the module otherwise:
 - Lanes are colored with theme keys (`LANE_COLORS`), and every line is
   fitted to `bodyColumns` in cells; `rows.test.ts` sweeps 1–160 columns,
   the queue and the help alike.
+- The queue takes at most `maxRows` lines (`bandLinesOf`, swept 1–45 rows
+  in `rows.test.ts`): short of rows, lanes fold into a line each
+  (`FOLD_ORDER`: cleanup first, needs rebase last), then the ready lane's
+  tail folds behind its head (`ready (+N): …`), then the lanes lowest in
+  the order are cut; the foot always stays. Past `maxRows` Claude Code cuts
+  the band's bottom itself ("↓ 14 more"), the status line with it: seen
+  live with 33 branches in a 50-row terminal, when only the lanes that need
+  nobody could fold.
 - The queue is a table (`tableColumnsOf`): the branch column as wide as the
   longest name shown, up to a share of the row; the other columns fixed, so
   every row of a drawing lines up under the column names. Fixed widths for

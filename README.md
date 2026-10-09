@@ -53,6 +53,12 @@ COMMENT is what a skill or agent left on the branch through the radar's
 tool: Claude's words, marked `✻` and quoted, shown until the branch moves.
 The column shows while a row has a comment, on a band wide enough for it.
 
+When Claude Code gives the band fewer rows than there are branches, lanes
+fold into one line each (`needs rebase (3): feat/a, feat/b, feat/c`):
+cleanup first, needs rebase last. The ready lane keeps its first branches,
+in landing order, and folds the rest into one line (`ready (+12): …`).
+The status line under the panel always stays.
+
 The band is framed like a panel, with three controls in its header:
 
 | Control | Does |

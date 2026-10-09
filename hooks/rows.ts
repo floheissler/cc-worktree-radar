@@ -119,9 +119,11 @@ export const LANE_COLORS: Readonly<Record<Lane, ThemeKey>> = {
 
 /**
  * Lanes folded into one line each, in this order, while the band has too
- * few rows: the ones that need nobody's action first.
+ * few rows: the ones that need nobody's action first, the ones waiting on
+ * a rebase last. The ready lane never folds whole: its head stays, in
+ * landing order, and only its tail folds (`bandLinesOf`).
  */
-const FOLD_ORDER: readonly Lane[] = ['CLEANUP', 'IN_PROGRESS', 'HOLD', 'STACKED']
+const FOLD_ORDER: readonly Lane[] = ['CLEANUP', 'IN_PROGRESS', 'HOLD', 'STACKED', 'NEEDS_REBASE']
 
 /**
  * From this width on a row shows every column; below it the commits ahead
@@ -616,15 +618,22 @@ export function rowOf(
 }
 
 /**
- * The line that stands for a folded lane: its label and its branches.
+ * The line that stands for a folded lane, or for the rest of one whose head
+ * has rows of its own: its label, how many it holds (`+` for the rest),
+ * and their names.
+ *
+ * @param lane the lane
+ * @param branches the branches the line stands for
+ * @param columns the cells it may take
+ * @param isRest whether rows above show the lane's first branches
  */
-function foldedLineOf(lane: Lane, branches: readonly BranchInfo[], columns: number): Line {
+function foldedLineOf(lane: Lane, branches: readonly BranchInfo[], columns: number, isRest = false): Line {
   return {
     key: `fold:${lane}`,
     segments: fitSegments(
       [
         { text: '   ' },
-        { text: `${LANE_LABELS[lane]} (${branches.length}): `, color: LANE_COLORS[lane] },
+        { text: `${LANE_LABELS[lane]} (${isRest ? '+' : ''}${branches.length}): `, color: LANE_COLORS[lane] },
         { text: sanitize(branches.map(branch => branch.name).join(', ')), dim: true },
       ],
       columns,
@@ -842,8 +851,12 @@ function nameOf(path: string): string {
 }
 
 /**
- * Lays the band out: the header, a row per branch (lanes that need nobody
- * folded into a line each when rows run short), and the foot.
+ * Lays the band out: the header, a row per branch, and the foot, in at most
+ * `maxRows` lines. When rows run short, lanes fold into a line each
+ * (`FOLD_ORDER`), then the ready lane's tail folds behind its head, then
+ * what still does not fit is cut from the bottom: the foot always stays,
+ * its counts naming every lane. Past `maxRows`, Claude Code cuts the band's
+ * bottom itself, and the foot with it.
  *
  * @param model what the band shows and the room it has
  * @returns the lines, each at most `columns` wide
@@ -896,15 +909,23 @@ export function bandLinesOf(model: BandModel): Line[] {
     }
   }
 
+  // The ready lane keeps its head, in landing order; a tail of two or more
+  // folds into one line after it
+  const ready = snapshot.branches.filter(branch => branch.lane === 'READY')
+  const over = rowsWith() - room
+  const trimmed = over > 0 ? Math.max(ready.length - over - 1, 1) : ready.length
+  const head = ready.length - trimmed >= 2 ? trimmed : ready.length
+  const rest = ready.slice(head)
+
   const ranks = new Map(snapshot.branches.flatMap(branch => (branch.rank === null ? [] : [[branch.name, branch.rank] as const])))
-  const shown = snapshot.branches.filter(branch => !folded.has(branch.lane))
+  const shown = snapshot.branches.filter(branch => !folded.has(branch.lane) && !rest.includes(branch))
   const table = tableColumnsOf(
     columns,
     shown.map(branch => sanitize(branch.name)),
     shown.map(branch => lineWidthOf({ key: '', segments: detailOf(branch, snapshot.base.name, ranks) })),
     shown.some(branch => branch.comment !== null && branch.comment !== ''),
   )
-  const lines: Line[] = [columnHeaderOf(table, headerRoomOf(model, columns))]
+  const body: Line[] = []
 
   for (const lane of Object.keys(LANE_LABELS) as Lane[]) {
     const inLane = snapshot.branches.filter(branch => branch.lane === lane)
@@ -914,15 +935,20 @@ export function bandLinesOf(model: BandModel): Line[] {
     }
 
     if (folded.has(lane)) {
-      lines.push(foldedLineOf(lane, inLane, columns))
+      body.push(foldedLineOf(lane, inLane, columns))
     } else {
-      lines.push(...inLane.map(branch => rowOf(branch, snapshot.base.name, table, columns, nowSeconds, ranks)))
+      body.push(
+        ...inLane.filter(branch => !rest.includes(branch)).map(branch => rowOf(branch, snapshot.base.name, table, columns, nowSeconds, ranks)),
+      )
+
+      if (lane === 'READY' && rest.length > 0) {
+        body.push(foldedLineOf(lane, rest, columns, true))
+      }
     }
   }
 
-  lines.push(foot)
-
-  return lines
+  // Still too many: the lanes lowest in the order go, the foot stays
+  return [columnHeaderOf(table, headerRoomOf(model, columns)), ...body.slice(0, room), foot]
 }
 
 /**
