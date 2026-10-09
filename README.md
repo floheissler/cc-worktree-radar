@@ -7,15 +7,15 @@ which are stacked on another, which a Claude session is still working on,
 and the order to land them in.
 
 ```
-╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-│  # BRANCH         LANE        AHEAD  AGE  NOTE                                                    h: help c: compact x: exit │
-│  1 feat/checkout  ready          +4  12m                                                                                     │
-│  2 fix/totals     ready          +1   3m  forces a rebase of feat/coupons                                                    │
-│  - feat/coupons   needs rebase   +6  20m  conflicts: cart.ts · rebase after #2 fix/totals                                    │
-│  - feat/search    in progress    +2   1m  search-worker busy                                                                 │
-│ ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄ │
-│ Worktree Radar · shop [main] · 2 ready · 1 needs rebase · 1 in progress · land next → feat/checkout   release v0.4.1 pending │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+╭─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│  # BRANCH         LANE        AHEAD  AGE  DETAIL                                           COMMENT   h: help c: compact x: exit │
+│  1 feat/checkout  ready          +4  12m                                                                                        │
+│  2 fix/totals     ready          +1   3m  forces a rebase of feat/coupons                                                       │
+│  - feat/coupons   needs rebase   +6  20m  conflicts: cart.ts · rebase after #2 fix/totals  ✻ “handed back to coupons-worker”    │
+│  - feat/search    in progress    +2   1m  session search-worker busy                                                            │
+│ ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄ │
+│ Worktree Radar · shop [main] · 2 ready · 1 needs rebase · 1 in progress · land next → feat/checkout      release v0.4.1 pending │
+╰─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
 ```
 
 It only looks. It never merges, rebases, tags, pushes or moves a ref.
@@ -41,16 +41,24 @@ Answer `y` to add the marketplace, then pick a scope.
 |---|---|
 | `/radar` | Opens the radar on the session's repository, or closes it |
 | `/radar <base>` | Opens it with another base branch than the detected one (`origin/HEAD`, else `main`, else `master`) |
-| `/radar help` | Opens it on its help: what each lane and note means |
+| `/radar help` | Opens it on its help: what each lane, detail and comment means |
 | `/radar hold <branch> [reason]` | Parks a branch, say one that is done but waits on a review: it leaves the landing order (the ready lane and `next`) whatever else it shows. Only the radar records it: the branch and git stay as they are. Every session of the repository on this machine sees the hold until it is let go |
 | `/radar unhold <branch>` | Lets it go again |
 | `/radar off` | Closes the radar |
+
+Each row is a branch: its place in the landing order, its lane, the commits
+it has ahead and the age of the last one. DETAIL is what the radar reads
+about it: why it is in its lane and what comes next (`conflicts: cart.ts`,
+`rebase after #2 fix/totals`, `lands after #1 feat/x`, who works there).
+COMMENT is what a skill or agent left on the branch through the radar's
+tool: Claude's words, marked `✻` and quoted, shown until the branch moves.
+The column shows while a row has a comment, on a band wide enough for it.
 
 The band is framed like a panel, with three controls in its header:
 
 | Control | Does |
 |---|---|
-| `h: help` | switches between the queue and a help that explains every lane, note and control |
+| `h: help` | switches between the queue and a help that explains every lane, detail, comment and control |
 | `c: compact` | folds the radar into one line: what lands next, then the counts; `c: expand` brings the queue back |
 | `x: exit` | closes the radar, as `/radar` does |
 

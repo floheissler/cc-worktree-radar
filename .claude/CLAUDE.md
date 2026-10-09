@@ -112,7 +112,7 @@ the module otherwise:
   `$.agent.list()` says it is not over (its task, `description`, with it),
   another session's while that session's pid is listed. A running agent puts
   its branch IN_PROGRESS like a busy session; one that was at work and is
-  gone wakes `session-idle` ("finished"). The row's note is
+  gone wakes `session-idle` ("finished"). The row's detail is
   `agent: <task>`, or `agent of <session>`.
 - The rebase order counts a branch as being rebased when its worktree is
   mid-rebase, or when it was found due a rebase (`dueMarks`) and is in
@@ -151,11 +151,25 @@ the module otherwise:
   longest name shown, up to a share of the row; the other columns fixed, so
   every row of a drawing lines up under the column names. Fixed widths for
   the branch column too were tried and dropped: short names left a wide
-  gap. Wide (from `WIDE_COLUMNS`) `#`, branch, lane, ahead, age, note; medium
-  drops ahead and shortens the lane labels; narrow keeps `#`, branch and
-  lane. A ready row's note says only what else there is (a stack on it, a
-  rebase it forces): "merges cleanly" is what ready means. Its first row names the columns (`columnHeaderOf`), the
-  controls at its end. Under a dotted dim rule (`dividerOf`, inside the
+  gap. Wide (from `WIDE_COLUMNS`) `#`, branch, lane, ahead, age, detail and,
+  while a row shown has one, comment; medium drops ahead and the comments
+  and shortens the lane labels; narrow keeps `#`, branch and lane. Its
+  first row names the columns (`columnHeaderOf`), the controls at its end.
+- A row's text comes in two columns, by who wrote it. DETAIL (`detailOf`)
+  is the radar's own, from the facts alone: why the branch is in its lane
+  and what comes next. A ready row's detail says only what else there is (a
+  stack on it, a rebase it forces): "merges cleanly" is what ready means; a
+  cleanup row's says `has a worktree`, its path being the snapshot's.
+  COMMENT (`commentOf`) is a caller's, set through the tool's `comment`:
+  Claude's words, as only a model calls the tool, so marked with the `✻`
+  Claude Code draws its own lines with, in `claude`, and quoted in italics
+  in `inactive` (light grey on a dark theme), cut inside its quotes. With a
+  comment shown, DETAIL is as wide as its longest, up to `DETAIL_SHARE` of
+  what the branch leaves, and COMMENT takes the rest, from
+  `COMMENT_MIN_CELLS`. A caller's comment used to lead the note, in blue and
+  joined by ` · `; the owner could not tell where it ended and the radar's
+  words began. The caller's status line stays a blue badge, unquoted: it is
+  a status, not a comment. Under a dotted dim rule (`dividerOf`, inside the
   padding), the foot is a status line read left to right
   (`statusLayoutsOf`): the title, `repo [base]`, the counts,
   `land next →`; messages (a caller's status, what to know) right-aligned.

@@ -48,6 +48,7 @@ export function bandView(
         {...(segment.color === undefined ? {} : { color: segment.color })}
         {...(segment.dim ? { dimColor: true } : {})}
         {...(segment.bold ? { bold: true } : {})}
+        {...(segment.italic ? { italic: true } : {})}
       >
         {segment.text}
       </Text>

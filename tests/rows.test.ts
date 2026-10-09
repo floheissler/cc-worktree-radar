@@ -53,7 +53,7 @@ describe('the band laid out', () => {
     const lines = bandLinesOf(modelOf(await fixtureSnapshot(), { columns: 140 }))
 
     // The column names on top; under a divider, the status line
-    expect(textOf(lines[0])).toMatch(/^ # BRANCH +LANE +AHEAD  AGE  NOTE$/)
+    expect(textOf(lines[0])).toMatch(/^ # BRANCH +LANE +AHEAD  AGE  DETAIL$/)
     expect(lines.map(line => line.key)).toEqual([
       'columns',
       'row:feat/parent',
@@ -137,7 +137,7 @@ describe('the band laid out', () => {
     }
   })
 
-  test('narrows: the commits ahead go first, then the notes', async () => {
+  test('narrows: the commits ahead go first, then the details', async () => {
     const snapshot = await fixtureSnapshot()
 
     expect(textOf(bandLinesOf(modelOf(snapshot, { columns: 50 }))[1])).toMatch(/^ 1 feat\/parent\s+ready +\d+[smhd]  feat\/child/)
@@ -242,6 +242,61 @@ describe('the band laid out', () => {
 
     expect(rowWith([agent])).toMatch(/in progress .* {2}agent: Fix the totals · /)
     expect(rowWith([{ ...agent, description: null }])).toMatch(/ {2}agent of coordinator · /)
+    expect(rowWith([{ id: 's', name: 'b-7c', status: 'busy', kind: 'session' }])).toMatch(/ {2}session b-7c busy · /)
+  })
+
+  test('a caller\'s comment gets a column of its own, after the radar\'s detail', async () => {
+    const snapshot = await fixtureSnapshot()
+    const commented = {
+      ...snapshot,
+      branches: snapshot.branches.map(branch => (branch.name === 'feat/conflict' ? { ...branch, comment: 'handed back to b-7c' } : branch)),
+    }
+    const lines = bandLinesOf(modelOf(commented, { columns: 160 }))
+    const header = textOf(lines[0])
+    const row = lines.find(line => line.key === 'row:feat/conflict')
+    const at = textOf(row).indexOf('✻')
+
+    // DETAIL as wide as its longest, then COMMENT, lined up with the comment
+    expect(header).toMatch(/AGE  DETAIL +COMMENT$/)
+    expect(at).toBe(header.indexOf('COMMENT'))
+    expect(row?.segments.slice(-2)).toEqual([
+      { text: '✻ ', color: 'claude' },
+      { text: '“handed back to b-7c”', color: 'inactive', italic: true },
+    ])
+    expect(textOf(row)).toMatch(/rebase after feat\/conflict2 +✻ “handed back to b-7c”$/)
+    // A row with no comment ends with its detail
+    expect(textOf(lines.find(line => line.key === 'row:feat/parent'))).toMatch(/feat\/child stacked on it +$/)
+
+    // A long comment is cut inside its quotes
+    const long = bandLinesOf(
+      modelOf({ ...commented, branches: commented.branches.map(branch => (branch.comment === null ? branch : { ...branch, comment: 'x'.repeat(300) })) }, { columns: 160 }),
+    ).find(line => line.key === 'row:feat/conflict')
+
+    expect(textOf(long)).toMatch(/✻ “x+…”$/)
+    expect(lineWidthOf(long as Line)).toBe(160)
+
+    // Below the wide layout, the comments go first; the detail stays
+    const medium = bandLinesOf(modelOf(commented, { columns: 60 }))
+
+    expect(textOf(medium[0])).toMatch(/DETAIL$/)
+    expect(textOf(medium.find(line => line.key === 'row:feat/conflict'))).not.toContain('✻')
+
+    // Without comments, no comment column
+    expect(textOf(bandLinesOf(modelOf(snapshot, { columns: 160 }))[0])).toMatch(/DETAIL$/)
+
+    for (let columns = 1; columns <= 160; columns += 1) {
+      for (const line of bandLinesOf(modelOf(commented, { columns }))) {
+        const room = line.key === 'columns' ? columns - controlsCellsOf(controlsOf(columns, false, false)) : columns
+
+        expect(lineWidthOf(line), `${line.key} at ${columns}`).toBeLessThanOrEqual(Math.max(room, 0))
+      }
+    }
+  })
+
+  test('a cleanup row says it has a worktree, not where', async () => {
+    const lines = bandLinesOf(modelOf(await fixtureSnapshot(), { columns: 160 }))
+
+    expect(textOf(lines.find(line => line.key === 'row:feat/landed'))).toMatch(/cleanup +landed in main · has a worktree$/)
   })
 
   test('draws untrusted names as text', async () => {
@@ -275,7 +330,7 @@ describe('the band laid out', () => {
 
       expect(textOf(lines[at - 1]), title).toBe(' ')
     }
-    expect(lines[2]?.segments[0]).toMatchObject({ text: expect.stringMatching(/^ {2}ready +$/), color: 'success' })
+    expect(lines[2]?.segments.slice(0, 2)).toEqual([{ text: '  ' }, { text: 'ready', color: 'success' }])
     expect(textOf(lines[2])).toMatch(/^ {2}ready +merges cleanly into main, nothing uncommitted/)
     expect(lines.some(line => line.segments.some(segment => segment.text.trim() === 'needs rebase' && segment.color === 'error'))).toBe(true)
     expect(lines.map(textOf).some(text => text.includes('[-]'))).toBe(false)

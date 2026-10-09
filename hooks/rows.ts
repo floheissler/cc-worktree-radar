@@ -19,6 +19,7 @@ export type Segment = {
   readonly color?: ThemeKey
   readonly dim?: boolean
   readonly bold?: boolean
+  readonly italic?: boolean
 }
 
 export type Line = {
@@ -120,8 +121,8 @@ const FOLD_ORDER: readonly Lane[] = ['CLEANUP', 'IN_PROGRESS', 'HOLD', 'STACKED'
 
 /**
  * From this width on a row shows every column; below it the commits ahead
- * go and the lane labels shorten; below the next, the age and the notes go
- * too.
+ * and the comments go and the lane labels shorten; below the next, the age
+ * and the details go too.
  */
 export const WIDE_COLUMNS = 64
 export const MEDIUM_COLUMNS = 40
@@ -129,7 +130,7 @@ export const MEDIUM_COLUMNS = 40
 /**
  * The fixed columns: the rank (` 1 `), the gap after the branch, commits
  * ahead (`   +3`) and the age of the last commit (`  25m`), the numbers
- * right-aligned, and the gap before the note.
+ * right-aligned, and the gap before the detail and before a comment.
  */
 const RANK_CELLS = 3
 const GAP_CELLS = 2
@@ -145,6 +146,21 @@ const BRANCH_SHARE = { wide: 0.45, medium: 0.5 } as const
 const BRANCH_MIN_CELLS = 6
 
 /**
+ * With comments shown, the most of what the row leaves after the branch
+ * that the detail column may take, and the least a comment column is worth:
+ * below it, the comments go.
+ */
+const DETAIL_SHARE = 0.6
+const DETAIL_MIN_CELLS = 6
+const COMMENT_MIN_CELLS = 16
+
+/**
+ * What marks a comment as Claude's words: the mark Claude Code draws its
+ * own lines with (`✻ Crunched for 7s`), in Claude's color.
+ */
+const COMMENT_MARK: Segment = { text: '✻ ', color: 'claude' }
+
+/**
  * The queue's columns at one width: each one's cells, 0 for a column the
  * width leaves out. The branch column is as wide as the longest name, up
  * to its share; the others are fixed, so every row of a drawing lines up.
@@ -155,17 +171,36 @@ export type TableColumns = {
   readonly labels: Readonly<Record<Lane, string>>
   readonly ahead: number
   readonly age: number
-  readonly hasNote: boolean
+  readonly hasDetail: boolean
+  /**
+   * The detail column's cells when a comment column follows it; 0 when the
+   * detail takes the rest of the row.
+   */
+  readonly detail: number
+  /**
+   * The comment column's cells; 0 when no comment is shown.
+   */
+  readonly comment: number
 }
 
 /**
- * Sizes the queue's columns to the band and the branches it shows.
+ * Sizes the queue's columns to the band and the branches it shows. A
+ * comment column comes only on a wide band, while a row shown has a
+ * comment; the detail column is then as wide as its longest, up to its
+ * share, and the comment takes the rest.
  *
  * @param columns the cells a row may take
  * @param names the branches' names, sanitized
+ * @param details the cells each shown branch's detail takes
+ * @param isCommented whether a branch shown has a comment
  * @returns the columns
  */
-export function tableColumnsOf(columns: number, names: readonly string[]): TableColumns {
+export function tableColumnsOf(
+  columns: number,
+  names: readonly string[],
+  details: readonly number[] = [],
+  isCommented = false,
+): TableColumns {
   const shortLabel = Math.max(...Object.values(SHORT_LANE_LABELS).map(label => label.length))
   const longest = Math.max(BRANCH_MIN_CELLS, ...names.map(cellWidth))
   const fit = (left: number, share: number): number => Math.max(Math.min(longest, Math.floor(left * share)), 1)
@@ -174,13 +209,21 @@ export function tableColumnsOf(columns: number, names: readonly string[]): Table
     const lane = Math.max(...Object.values(LANE_LABELS).map(label => label.length))
     const left = columns - RANK_CELLS - GAP_CELLS - lane - AHEAD_CELLS - AGE_CELLS - GAP_CELLS
 
+    const branch = fit(left, BRANCH_SHARE.wide)
+    const rest = left - branch
+    const detail = Math.min(Math.max(DETAIL_MIN_CELLS, ...details), Math.floor(rest * DETAIL_SHARE))
+    const comment = rest - detail - GAP_CELLS
+    const isShown = isCommented && comment >= COMMENT_MIN_CELLS
+
     return {
-      branch: fit(left, BRANCH_SHARE.wide),
+      branch,
       lane,
       labels: LANE_LABELS,
       ahead: AHEAD_CELLS,
       age: AGE_CELLS,
-      hasNote: true,
+      hasDetail: true,
+      detail: isShown ? detail : 0,
+      comment: isShown ? comment : 0,
     }
   }
 
@@ -193,7 +236,9 @@ export function tableColumnsOf(columns: number, names: readonly string[]): Table
       labels: SHORT_LANE_LABELS,
       ahead: 0,
       age: AGE_CELLS,
-      hasNote: true,
+      hasDetail: true,
+      detail: 0,
+      comment: 0,
     }
   }
 
@@ -203,7 +248,9 @@ export function tableColumnsOf(columns: number, names: readonly string[]): Table
     labels: SHORT_LANE_LABELS,
     ahead: 0,
     age: 0,
-    hasNote: false,
+    hasDetail: false,
+    detail: 0,
+    comment: 0,
   }
 }
 
@@ -230,8 +277,12 @@ export function columnHeaderOf(table: TableColumns, columns: number): Line {
     groups.push([name('AGE'.padStart(table.age))])
   }
 
-  if (table.hasNote) {
-    groups.push([name(' '.repeat(GAP_CELLS)), name('NOTE')])
+  if (table.hasDetail) {
+    groups.push([name(' '.repeat(GAP_CELLS)), name(table.comment > 0 ? padEnd('DETAIL', table.detail) : 'DETAIL')])
+  }
+
+  if (table.comment > 0) {
+    groups.push([name(' '.repeat(GAP_CELLS)), name('COMMENT')])
   }
 
   // A column name is shown whole or not at all, never cut
@@ -391,26 +442,24 @@ export function fitSegments(segments: readonly Segment[], cells: number): Segmen
 }
 
 /**
- * What a row says beside its lane, shortest first to go.
+ * What the radar reads about a row's branch beside its lane: why it is
+ * there and what comes next, from the facts alone. A caller's words are the
+ * comment's, never here.
  *
  * @param branch the branch
  * @param base the base branch's name
- * @returns the note's runs, sanitized
+ * @returns the detail's runs, sanitized
  */
-export function noteOf(branch: BranchInfo, base: string, ranks: ReadonlyMap<string, number> = new Map()): Segment[] {
+export function detailOf(branch: BranchInfo, base: string, ranks: ReadonlyMap<string, number> = new Map()): Segment[] {
   const parts: Segment[] = []
   const tree = branch.worktree
   const name = (text: string): string => sanitize(text)
-  // Another branch as a note names it: with its place in the landing order
+  // Another branch in a detail is named with its place in the landing order
   // when it has one (`#1 feat/x`)
   const ref = (other: string): string => {
     const rank = ranks.get(other)
 
     return rank === undefined ? name(other) : `#${rank} ${name(other)}`
-  }
-
-  if (branch.comment !== null) {
-    parts.push({ text: name(branch.comment), color: 'remember' })
   }
 
   switch (branch.lane) {
@@ -419,7 +468,7 @@ export function noteOf(branch: BranchInfo, base: string, ranks: ReadonlyMap<stri
         parts.push({ text: `${name(shortList(branch.dependents, 1))} stacked on it`, dim: true })
       }
 
-      // Ready already says it merges cleanly: the note only adds what else
+      // Ready already says it merges cleanly: the detail only adds what else
       if (branch.breaks.length > 0) {
         parts.push({ text: `forces a rebase of ${shortList(branch.breaks.map(broken => ref(broken.branch)), 1)}`, dim: true })
       }
@@ -448,7 +497,7 @@ export function noteOf(branch: BranchInfo, base: string, ranks: ReadonlyMap<stri
           dim: true,
         })
       } else if (busy !== undefined) {
-        parts.push({ text: `${name(busy.name)} ${name(busy.status)}`, dim: true })
+        parts.push({ text: `session ${name(busy.name)} ${name(busy.status)}`, dim: true })
       }
 
       if ((tree?.dirty ?? 0) > 0) {
@@ -469,14 +518,35 @@ export function noteOf(branch: BranchInfo, base: string, ranks: ReadonlyMap<stri
         parts.push({ text: branch.isLanded ? `landed in ${name(base)}` : `nothing beyond ${name(base)}`, dim: true })
       }
 
+      // Where it is, the snapshot says; here, that there is one to remove
       if (tree !== null) {
-        parts.push({ text: `worktree ${name(tree.path)}`, dim: true })
+        parts.push({ text: 'has a worktree', dim: true })
       }
 
       break
   }
 
   return parts.flatMap((part, at) => (at === 0 ? [part] : [{ text: ' · ', dim: true }, part]))
+}
+
+/**
+ * A caller's comment on a row: Claude's words, as only the model calls the
+ * radar's tool, marked as Claude Code marks its own lines and quoted, the
+ * quote cut inside its marks to fit.
+ *
+ * @param branch the branch
+ * @param cells the cells the comment may take
+ * @returns the comment's runs, sanitized; none without a comment or room
+ */
+export function commentOf(branch: BranchInfo, cells: number): Segment[] {
+  const marks = cellWidth(COMMENT_MARK.text) + 2
+  const text = branch.comment === null ? '' : sanitize(branch.comment)
+
+  if (text === '' || cells <= marks) {
+    return []
+  }
+
+  return [COMMENT_MARK, { text: `“${truncateEnd(text, cells - marks)}”`, color: 'inactive', italic: true }]
 }
 
 /**
@@ -516,8 +586,19 @@ export function rowOf(
     segments.push({ text: (branch.ahead > 0 ? ageOf(nowSeconds - branch.lastCommitAt) : '').padStart(table.age), dim: true })
   }
 
-  if (table.hasNote) {
-    segments.push({ text: ' '.repeat(GAP_CELLS) }, ...noteOf(branch, base, ranks))
+  if (table.hasDetail) {
+    const detail = detailOf(branch, base, ranks)
+
+    segments.push({ text: ' '.repeat(GAP_CELLS) })
+
+    if (table.comment > 0) {
+      const fitted = fitSegments(detail, table.detail)
+
+      segments.push(...fitted, { text: ' '.repeat(table.detail - lineWidthOf({ key: '', segments: fitted }) + GAP_CELLS) })
+      segments.push(...commentOf(branch, table.comment))
+    } else {
+      segments.push(...detail)
+    }
   }
 
   return { key: `row:${branch.name}`, segments: fitSegments(segments, columns) }
@@ -832,9 +913,12 @@ export function bandLinesOf(model: BandModel): Line[] {
   }
 
   const ranks = new Map(snapshot.branches.flatMap(branch => (branch.rank === null ? [] : [[branch.name, branch.rank] as const])))
+  const shown = snapshot.branches.filter(branch => !folded.has(branch.lane))
   const table = tableColumnsOf(
     columns,
-    snapshot.branches.filter(branch => !folded.has(branch.lane)).map(branch => sanitize(branch.name)),
+    shown.map(branch => sanitize(branch.name)),
+    shown.map(branch => lineWidthOf({ key: '', segments: detailOf(branch, snapshot.base.name, ranks) })),
+    shown.some(branch => branch.comment !== null && branch.comment !== ''),
   )
   const lines: Line[] = [columnHeaderOf(table, headerRoomOf(model, columns))]
 
@@ -892,6 +976,10 @@ export function wrapWords(text: string, cells: number): string[] {
  * One entry of the help: a term in its own style, what it means beside it.
  */
 type HelpEntry = {
+  /**
+   * A mark drawn before the term, in its own style (a comment's ✻).
+   */
+  readonly mark?: Segment
   readonly term: Segment
   readonly meaning: string
 }
@@ -929,7 +1017,7 @@ export function helpLinesOf(base: string, columns: number): Line[] {
         {
           term: { text: '1 2 3', bold: true },
           meaning:
-            'the order to land the ready branches in: stack parents first, then whichever forces the least rebase work on the others, then whichever finished first. A branch with - in place of a number cannot land yet: its lane and note say why',
+            'the order to land the ready branches in: stack parents first, then whichever forces the least rebase work on the others, then whichever finished first. A branch with - in place of a number cannot land yet: its lane and detail say why',
         },
         { term: { text: '+3' }, meaning: `commits the branch has that ${onto} lacks` },
         { term: { text: '5m' }, meaning: 'since its last commit' },
@@ -939,6 +1027,11 @@ export function helpLinesOf(base: string, columns: number): Line[] {
         { term: { text: 'forces a rebase of X' }, meaning: 'landing this branch makes X conflict' },
         { term: { text: 'X stacked on it' }, meaning: 'X holds this branch: this one lands first' },
         { term: { text: `landed in ${onto}` }, meaning: `its work reached ${onto} through a merge` },
+        {
+          mark: COMMENT_MARK,
+          term: { text: '“handed back”', color: 'inactive', italic: true },
+          meaning: 'a comment: words Claude left on the branch through the radar\'s tool, shown until the branch moves. The details beside it are the radar\'s own',
+        },
       ],
     },
     {
@@ -977,14 +1070,17 @@ export function helpLinesOf(base: string, columns: number): Line[] {
 
     for (const entry of section.entries) {
       const key = `help:${section.title}:${entry.term.text}`
-      const term = { ...entry.term, text: truncateEnd(entry.term.text, Math.max(columns - 2, 1)) }
+      const marked: Segment[] = [{ text: '  ' }, ...(entry.mark === undefined ? [] : [entry.mark]), entry.term]
+      const term = fitSegments(marked, Math.max(columns, 1))
 
       if (isSideBySide) {
+        const cells = lineWidthOf({ key: '', segments: term })
+
         wrapWords(entry.meaning, columns - TERM_CELLS).forEach((text, at) => {
           lines.push({
             key: `${key}:${at}`,
             segments: fitSegments(
-              [at === 0 ? { ...term, text: padEnd(`  ${term.text}`, TERM_CELLS) } : { text: ' '.repeat(TERM_CELLS) }, { text, dim: true }],
+              [...(at === 0 ? [...term, { text: ' '.repeat(Math.max(TERM_CELLS - cells, 0)) }] : [{ text: ' '.repeat(TERM_CELLS) }]), { text, dim: true }],
               columns,
             ),
           })
@@ -993,7 +1089,7 @@ export function helpLinesOf(base: string, columns: number): Line[] {
         continue
       }
 
-      lines.push({ key, segments: fitSegments([{ text: '  ' }, term], columns) })
+      lines.push({ key, segments: term })
       wrapWords(entry.meaning, Math.max(columns - 4, 1)).forEach((text, at) => {
         lines.push({ key: `${key}:${at}`, segments: fitSegments([{ text: '    ' }, { text, dim: true }], columns) })
       })
