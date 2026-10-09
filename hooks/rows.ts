@@ -731,24 +731,6 @@ export function fitWhole(groups: readonly (readonly Segment[])[], cells: number)
 }
 
 /**
- * What each lane holds, in lane order, one group per lane after the first
- * led by its separator: `3 ready`, ` · 1 stacked`.
- */
-function countGroupsOf(snapshot: Snapshot): Segment[][] {
-  const groups: Segment[][] = []
-
-  for (const lane of Object.keys(LANE_LABELS) as Lane[]) {
-    const count = snapshot.branches.filter(branch => branch.lane === lane).length
-
-    if (count > 0) {
-      groups.push([...(groups.length === 0 ? [] : [{ text: ' · ', dim: true }]), { text: `${count} ${LANE_LABELS[lane]}`, color: LANE_COLORS[lane] }])
-    }
-  }
-
-  return groups
-}
-
-/**
  * What each lane holds, in lane order: `3 ready`, `1 stacked`; with the
  * short labels, `2 rebase`, `1 wip`.
  */
