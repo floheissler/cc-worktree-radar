@@ -669,7 +669,7 @@ export function helpLinesOf(base: string, columns: number): Line[] {
         {
           term: { text: '/radar hold <branch>' },
           meaning:
-            'parks a branch, with an optional reason: say it is done but waits on a review. It leaves the ready lane and next skips it. Only the radar notes it: the branch and git stay as they are. Every session of this repository on this machine sees the hold until /radar unhold <branch>',
+            'parks a branch. Words after it are the reason, shown on its row: /radar hold feat/x waits on review. It leaves the ready lane and next skips it. Only the radar notes it: the branch and git stay as they are. Every session of this repository on this machine sees the hold until /radar unhold <branch>',
         },
       ],
     },
