@@ -54,8 +54,9 @@ The band is framed like a panel, with three controls in its header:
 | `c: compact` | folds the radar into one line: what lands next, then the counts; `c: expand` brings the queue back |
 | `x: exit` | closes the radar, as `/radar` does |
 
-Under a divider, the status line reads left to right: the sweep (`◜`, a
-step per check; standing still means the radar stalled) and the title, the
+Under a divider, the status line reads left to right: the sweep (`◜`, in
+Claude orange, turning while the radar checks the repository; standing
+still means the radar stalled) and the title, the
 repository and its base (`shop [main]`), what each lane holds, and what
 lands next. Its right end holds messages: a skill's status line, uncommitted
 files in the main worktree, a failed read. On a narrow band the messages go

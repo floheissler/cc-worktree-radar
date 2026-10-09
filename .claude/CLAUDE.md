@@ -131,8 +131,16 @@ the module otherwise:
   and the title (`MESSAGE_OUTRANKS`), never more. Compact, the band is that
   status line alone. `fitWhole` keeps whole pieces where a cut one would
   read wrong.
-- The sweep (`sweepOf`) is computed from the time and the poll interval:
-  it moves a step per check with no state of its own, as the polls redraw.
+- The sweep (`hooks/sweep.ts`) is a one-cell `Raster` on the terminal,
+  repainted by `$.ui.blit` every `SWEEP_FRAME_MS` with no render pass
+  (checked live on 2.1.295: it turns, and only that cell changes). It
+  advances only while the radar's checks are on time (`radar.lastCheckAt`,
+  `LIVE_INTERVALS`), so a still sweep means a stalled radar. Its color is
+  Claude's orange: `SWEEP_RGB` in the Raster (RGB only), the `claude` theme
+  key where it is text. The desktop has no Raster: there the glyph is text
+  and moves a step per check (`sweepOf`, from the time and the interval). A
+  blit refused (the band folded, the help shown) stops the timer; the next
+  drawing with a sweep starts it again (`ensure`).
 - The frame's border is Claude Code's, drawn over anything a mod lays on it:
   checked live on 2.1.295, a title placed with `position: "absolute"` over
   the top edge did not show, and overlays reach the padding cells only. So

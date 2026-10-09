@@ -19,6 +19,11 @@ export type Segment = {
   readonly color?: ThemeKey
   readonly dim?: boolean
   readonly bold?: boolean
+  /**
+   * The sweep's glyph: the terminal draws it in a cell of its own, which
+   * turns without a redraw (`view.tsx`).
+   */
+  readonly isSweep?: true
 }
 
 export type Line = {
@@ -85,7 +90,7 @@ export function sweepOf(now: number, pollMs: number): string {
  * foot, or the compact line).
  */
 export function titleOf(sweep: string): Segment[] {
-  return [{ text: `${sweep} `, color: 'suggestion' }, { text: BAND_TITLE, bold: true }]
+  return [{ text: sweep, color: 'claude', isSweep: true }, { text: ' ' }, { text: BAND_TITLE, bold: true }]
 }
 
 export const LANE_LABELS: Readonly<Record<Lane, string>> = {
@@ -695,7 +700,7 @@ function statusLayoutsOf(model: BandModel, snapshot: Snapshot, after: readonly S
   const counts = countsOf(snapshot)
   const short = countsOf(snapshot, SHORT_LANE_LABELS)
   const next = nextOf(snapshot)
-  const sweptPlace: Segment[] = [{ text: `${model.sweep} `, color: 'suggestion' }, ...place]
+  const sweptPlace: Segment[] = [{ text: model.sweep, color: 'claude', isSweep: true }, { text: ' ' }, ...place]
 
   return [
     joined([titleOf(model.sweep), place, counts, next, after]),
@@ -959,7 +964,7 @@ export function helpLinesOf(base: string, columns: number): Line[] {
     {
       title: 'Status line',
       entries: [
-        { term: { text: `${SWEEP_FRAMES[0]} Worktree Radar`, color: 'suggestion' }, meaning: 'the sweep turns a step per check: when it stands still, the radar has stalled' },
+        { term: { text: `${SWEEP_FRAMES[0]} Worktree Radar`, color: 'claude' }, meaning: 'the sweep turns while the radar checks the repository: when it stands still, the radar has stalled' },
         { term: { text: `repo [${onto}]` }, meaning: `the repository, and the base branch everything lands on` },
         { term: { text: '3 ready · 1 stacked' }, meaning: 'how many branches each lane holds' },
         { term: { text: 'land next → X' }, meaning: 'the branch ranked #1' },

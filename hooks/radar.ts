@@ -101,6 +101,11 @@ export type Radar = {
    * @returns null, or why not
    */
   readonly setNote: (host: Host, root: string, branch: string, text: string) => Promise<string | null>
+  /**
+   * When the polls last checked the repository, in milliseconds since the
+   * epoch; 0 while stopped.
+   */
+  readonly lastCheckAt: () => number
 }
 
 /**
@@ -159,6 +164,7 @@ export function createRadar(): Radar {
   let shownFingerprint: string | null = null
   let pendingFingerprint: string | null = null
   let lastReadAt = 0
+  let lastCheckAt = 0
   let ticks = 0
   let lastSessions: SessionRow[] | null | undefined
   let running: Promise<void> | null = null
@@ -245,6 +251,7 @@ export function createRadar(): Radar {
     }
 
     lastReadAt = now
+    lastCheckAt = now
 
     if (result.problem !== undefined) {
       await host.state.problem.set(() => result.problem)
@@ -308,6 +315,8 @@ export function createRadar(): Radar {
     const probe = await probeOf(host, gitOf(host.run, radar.root), ticks % SESSIONS_EVERY === 0 ? undefined : lastSessions)
     const now = await host.now()
 
+    lastCheckAt = now
+
     lastSessions = probe?.sessions
 
     if (at !== generation) {
@@ -352,12 +361,14 @@ export function createRadar(): Radar {
     },
     stop: () => {
       generation += 1
+      lastCheckAt = 0
       timer?.cancel()
       timer = null
       shownFingerprint = null
       pendingFingerprint = null
     },
     readNow,
+    lastCheckAt: () => lastCheckAt,
     setHold: async (host, root, branch, reason) => {
       const git = gitOf(host.run, root)
       const place = await placeOf(git)
