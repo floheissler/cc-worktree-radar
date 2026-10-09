@@ -594,7 +594,6 @@ export function helpLinesOf(base: string, columns: number): Line[] {
       entries: [
         { term: { text: 'h' }, meaning: 'this help, and back; the band takes keys after ctrl+x tab or a click' },
         { term: { text: '×' }, meaning: 'closes the radar, as /radar does' },
-        { term: { text: '[-]' }, meaning: "Claude Code's own: folds the band away (ctrl+x ctrl+a)" },
         { term: { text: '/radar hold <branch>' }, meaning: 'parks a branch; /radar unhold <branch> lets it go' },
       ],
     },

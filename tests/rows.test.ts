@@ -192,7 +192,7 @@ describe('the band laid out', () => {
     expect(lines[2]?.segments[0]).toMatchObject({ text: expect.stringMatching(/^ {2}ready +$/), color: 'success' })
     expect(textOf(lines[2])).toMatch(/^ {2}ready +merges cleanly into main, nothing uncommitted/)
     expect(lines.some(line => line.segments.some(segment => segment.text.trim() === 'needs rebase' && segment.color === 'error'))).toBe(true)
-    expect(lines.map(textOf).some(text => text.includes("Claude Code's own: folds the band away"))).toBe(true)
+    expect(lines.map(textOf).some(text => text.includes('[-]'))).toBe(false)
 
     for (let columns = 1; columns <= 160; columns += 1) {
       for (const line of bandLinesOf(modelOf(snapshot, { columns, isHelpShown: true }))) {
