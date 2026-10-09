@@ -247,6 +247,51 @@ async function rebasedBranchOf(
 }
 
 /**
+ * A reflog entry that made a commit on the branch itself, as git writes it
+ * (a literal in git's source, never translated): a commit, but not one
+ * concluding a merge, a cherry-pick, a revert, a patch applied by `git am`.
+ */
+const OWN_COMMIT = /^(?:commit(?: \((?:amend|initial|cherry-pick|rebase)\))?|cherry-pick|revert|am): /
+
+/**
+ * A rebase, or `pull --rebase`, ending on the branch: it carries the
+ * branch's own commits onto a new base.
+ */
+const REBASE_FINISH = /\(finish\): refs\/heads\//
+
+/**
+ * The branch's latest own work by its reflog (`git reflog show
+ * --format=%H%x00%gs`, newest first): the newest entry that made a commit
+ * on it, or carried such commits on in a rebase. A move that brought nothing
+ * of its own (its creation, a fast-forward to the base, a reset) does not
+ * count.
+ *
+ * @param stdout what git wrote
+ * @returns that entry's commit, or null for a branch that made none
+ */
+export function ownWorkOf(stdout: string): string | null {
+  let hasMade = false
+  let work: string | null = null
+
+  for (const line of stdout.split('\n').reverse()) {
+    const at = line.indexOf('\u0000')
+
+    if (at < 1) {
+      continue
+    }
+
+    const subject = line.slice(at + 1)
+
+    if (OWN_COMMIT.test(subject) || (hasMade && REBASE_FINISH.test(subject))) {
+      hasMade = true
+      work = line.slice(0, at)
+    }
+  }
+
+  return work
+}
+
+/**
  * Counts the lines of `git status --porcelain`.
  *
  * @param stdout what git wrote

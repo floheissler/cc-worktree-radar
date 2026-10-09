@@ -34,8 +34,9 @@ const Limits = {
    */
   REASON_CHARS: 200,
   /**
-   * How far back the base's first-parent line is read to tell a landed
-   * branch from a fresh one; a tip older than that reads as fresh.
+   * How far back the base's first-parent line is read to tell a branch that
+   * landed through a merge from a fresh one; a tip older than that reads as
+   * fresh unless the branch's reflog shows it landed.
    */
   FIRST_PARENT_COMMITS: 10_000,
   /**

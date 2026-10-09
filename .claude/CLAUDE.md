@@ -90,16 +90,28 @@ the module otherwise:
 
 - The analysis stays behavior-compatible with `pipeline.py snapshot` for
   every fact the script computes, minus releases and hand-backs, and one
-  deliberate difference: a branch with nothing left to land whose tip is off
-  the base's first-parent line (`isLanded`, read with `git rev-list
-  --first-parent`) landed through a merge, so an idle session left in its
-  worktree keeps it in CLEANUP, where the script showed IN_PROGRESS "no
-  commits yet". A fast-forward or a tip older than `FIRST_PARENT_COMMITS`
-  reads as fresh, as before. To check a
+  deliberate difference: a branch with nothing left to land that landed
+  (`isLanded`) reads so, and an idle session left in its worktree keeps it
+  in CLEANUP, where the script showed IN_PROGRESS "no commits yet". It
+  landed through a merge when its tip is off the base's first-parent line
+  (`git rev-list --first-parent`, up to `FIRST_PARENT_COMMITS`). A
+  fast-forward leaves no merge, its tip on that line like a fresh branch's,
+  so the branch's own reflog decides (`ownWorkOf`, `git reflog show`): it
+  landed when its latest own work is in the base (`git merge-base
+  --is-ancestor`). Own work is an entry git writes for a commit made on the
+  branch (`commit`, `commit (amend)`, `cherry-pick`, `revert`, `am`; not
+  `commit (merge)`), or a rebase's `(finish)` after one; creation,
+  fast-forwards and resets bring none. These are literals in git's source,
+  never translated (checked in `branch.c`, `builtin/commit.c`, `sequencer.c`,
+  `builtin/am.c`, and live on git 2.53). Without a reflog (none kept,
+  expired) a branch reads fresh, as the script read it; a squash merge, its
+  commits rewritten, stays undetected. To check a
   change against real git, run `hooks/analysis.ts` under Node (type
   stripping, with a resolve hook that adds `.ts`) on a throwaway repository
   and compare with `pipeline.py -C <repo> snapshot --json`. Re-record
-  `tests/fixtures/repo.ts` the same way when the git runs change.
+  `tests/fixtures/repo.ts` the same way when the git runs change. The
+  recording predates the reflog read: its reflog runs replay as missing (no
+  reflog), and the reflog's path is tested with runs a test adds.
 - A read runs only once a change has settled (`SETTLE_MS`), one at a time
   (`readNow` queues at most one more), and again every `REFRESH_MS` with no
   change seen. A poll is cheap: the branch tips, the worktree list and,

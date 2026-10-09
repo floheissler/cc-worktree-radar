@@ -127,9 +127,11 @@ export type BranchInfo = {
    */
   readonly isRebaseDue: boolean
   /**
-   * Nothing left to land, and its tip reached the base through a merge:
-   * off the base's first-parent line. A branch that never had work of its
-   * own, or landed by a fast-forward, sits on that line and reads false.
+   * Nothing left to land, and its work reached the base: through a merge
+   * (its tip off the base's first-parent line), or, by the branch's own
+   * reflog, a fast-forward (its latest own commit in the base). A branch
+   * that never had work of its own reads false, as does one without a
+   * reflog that landed by a fast-forward, and one squash-merged.
    */
   readonly isLanded: boolean
   readonly hold: Hold | null

@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'claude-code/testing'
 
-import { baseOf, countStatus, displayPathOf, parseHeads, parseWorktrees, type Head } from '../hooks/repo'
+import { baseOf, countStatus, displayPathOf, ownWorkOf, parseHeads, parseWorktrees, type Head } from '../hooks/repo'
 import { agentsByWorktree, claudeLockOf, folderKeyOf, parseSessions, sessionsByWorktree } from '../hooks/sessions'
 
 const head = (sha: string): Head => ({ sha, committedAt: 1, upstream: null })
@@ -54,6 +54,34 @@ describe('git output', () => {
     expect(displayPathOf('/work', '/work')).toBe('.')
     expect(displayPathOf('/work', '/elsewhere/x')).toBe('/elsewhere/x')
     expect(displayPathOf('/work', '/work-other')).toBe('/work-other')
+  })
+})
+
+describe('a branch\'s own work, by its reflog', () => {
+  // As git 2.53 wrote them, newest first (`%H%x00%gs`, shas shortened)
+  const reflog = (...entries: string[]) => entries.map(entry => entry.replace(' ', '\u0000')).join('\n') + '\n'
+
+  test('the newest commit it made itself, carried on by a rebase', () => {
+    expect(ownWorkOf(reflog('78e5500 commit: a2', 'ab83293 commit: a1', '34f3a76 branch: Created from HEAD'))).toBe('78e5500')
+    expect(ownWorkOf(reflog('0f2f5e2 commit (amend): b1x', '8bb2697 commit: b1', '78e5500 branch: Created from HEAD'))).toBe('0f2f5e2')
+    expect(
+      ownWorkOf(reflog('851760d rebase (finish): refs/heads/rebased onto 6ad5234', '2ff0de6 commit: r1', '0f2f5e2 branch: Created from HEAD')),
+    ).toBe('851760d')
+    expect(ownWorkOf(reflog('7772fd3 cherry-pick: base3', '6ad5234 branch: Created from main~2'))).toBe('7772fd3')
+    expect(ownWorkOf(reflog('3ee58c2 revert: Revert "base3"', 'a6beb6f branch: Created from HEAD'))).toBe('3ee58c2')
+    expect(ownWorkOf(reflog('099c7b9 am: base3', '851760d branch: Created from main~1'))).toBe('099c7b9')
+    // Work later thrown away is still its latest: whether it is in the base
+    // tells landed from abandoned
+    expect(ownWorkOf(reflog('851760d reset: moving to main', '1743f99 commit: z1', '851760d branch: Created from HEAD'))).toBe('1743f99')
+  })
+
+  test('none for a branch that only ever followed others', () => {
+    expect(ownWorkOf(reflog('34f3a76 branch: Created from main'))).toBeNull()
+    expect(ownWorkOf(reflog('851760d merge main: Fast-forward', '0f2f5e2 branch: Created from main~2'))).toBeNull()
+    // A rebase or a merge commit with nothing of its own before it
+    expect(ownWorkOf(reflog('aa11bb2 rebase (finish): refs/heads/x onto 6ad5234', '0f2f5e2 branch: Created from main'))).toBeNull()
+    expect(ownWorkOf(reflog('cc33dd4 commit (merge): Merge branch \'main\'', '0f2f5e2 branch: Created from main'))).toBeNull()
+    expect(ownWorkOf('')).toBeNull()
   })
 })
 

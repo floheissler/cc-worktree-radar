@@ -101,6 +101,30 @@ describe('reading a repository', () => {
     })
   })
 
+  test('a branch fast-forwarded into the base reads as landed, by its reflog', async () => {
+    // chore/merged: nothing beyond main, its tip on main's first-parent line
+    const first = await snapshotOf(inputOf(replayOf().run))
+    const tip = first.branches.find(branch => branch.name === 'chore/merged')?.sha ?? ''
+    const reflogKey = JSON.stringify(['/work', 'reflog', 'show', '--format=%H%x00%gs', 'refs/heads/chore/merged', '--'])
+    const ancestorKey = JSON.stringify(['/work', 'merge-base', '--is-ancestor', 'abc1234', first.base.sha])
+    const withReflog = (isInBase: boolean) => ({
+      ...RUNS,
+      [reflogKey]: { code: 0, stdout: `abc1234\u0000commit: tidy up\n${tip}\u0000branch: Created from main\n` },
+      [ancestorKey]: { code: isInBase ? 0 : 1, stdout: '' },
+    })
+    const mergedOf = async (runs: typeof RUNS) =>
+      (await snapshotOf(inputOf(replayOf(runs).run))).branches.find(branch => branch.name === 'chore/merged')
+
+    // Its own commit is in main: it landed, though no merge shows it
+    expect(await mergedOf(withReflog(true))).toMatchObject({ lane: 'CLEANUP', isLanded: true, summary: 'landed in main' })
+    // Its own commit was thrown away: it never landed
+    expect(await mergedOf(withReflog(false))).toMatchObject({ isLanded: false, summary: 'no commits beyond main' })
+    // No reflog kept: as before, fresh
+    expect(first.branches.find(branch => branch.name === 'chore/merged')?.isLanded).toBe(false)
+    // A branch that landed through a merge needs no reflog
+    expect(first.branches.find(branch => branch.name === 'feat/landed')?.isLanded).toBe(true)
+  })
+
   test('a worktree a running subagent holds is in progress, by its lock', async () => {
     // Claude Code's lock on the landed branch's worktree, for an agent of the
     // session with pid 42

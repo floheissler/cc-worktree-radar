@@ -1038,7 +1038,7 @@ export function helpLinesOf(base: string, columns: number): Line[] {
         { term: { text: 'lands after #1 X' }, meaning: 'stacked on X: it lands once X has landed' },
         { term: { text: 'forces a rebase of X' }, meaning: 'landing this branch makes X conflict' },
         { term: { text: 'X stacked on it' }, meaning: 'X holds this branch: this one lands first' },
-        { term: { text: `landed in ${onto}` }, meaning: `its work reached ${onto} through a merge` },
+        { term: { text: `landed in ${onto}` }, meaning: `its work reached ${onto}: through a merge, or a fast-forward its reflog shows` },
         {
           mark: COMMENT_MARK,
           term: { text: '“handed back”', color: 'inactive', italic: true },

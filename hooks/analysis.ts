@@ -6,6 +6,7 @@ import {
   baseOf,
   countStatus,
   displayPathOf,
+  ownWorkOf,
   placeOf,
   readHeads,
   readOriginHead,
@@ -311,12 +312,10 @@ async function read(input: ReadInput): Promise<ReadResult> {
   const open = names.filter(name => of(name).commits.size > 0)
   const done = names.filter(name => of(name).commits.size === 0)
 
-  // A branch with nothing left to land either landed through a merge (its
-  // tip reached from the base only through a merge's second parent) or never
-  // had work of its own (its tip on the base's first-parent line). A
-  // fast-forward puts a landed tip on that line too, so it reads as fresh;
-  // so does a tip older than the line read, which is how the script read
-  // every such branch.
+  // A branch with nothing left to land either landed or never had work of
+  // its own. One that landed through a merge has its tip reached from the
+  // base only through a merge's second parent, off the base's first-parent
+  // line. The script read every such branch as fresh.
   if (done.length > 0) {
     const line = await git(['rev-list', '--first-parent', `--max-count=${Limits.FIRST_PARENT_COMMITS}`, baseSha])
 
@@ -329,6 +328,24 @@ async function read(input: ReadInput): Promise<ReadResult> {
       }
     }
   }
+
+  // A fast-forward leaves no merge behind: the branch's tip is on the
+  // first-parent line, as a fresh branch's is. Its own reflog tells them
+  // apart: a branch whose latest own work is in the base has landed,
+  // fast-forwarded, rebased first or merged. Without a reflog (none kept,
+  // or expired) it reads as before.
+  await mapLimit(
+    done.filter(name => !of(name).isLanded),
+    Limits.GIT_PARALLEL,
+    async name => {
+      const reflog = await git(['reflog', 'show', '--format=%H%x00%gs', `refs/heads/${name}`, '--'])
+      const work = reflog === null ? null : ownWorkOf(reflog.stdout)
+
+      if (work !== null && (await git(['merge-base', '--is-ancestor', work, baseSha])) !== null) {
+        of(name).isLanded = true
+      }
+    },
+  )
 
   // Stacking: B sits on A when A's unmerged commits are a strict subset of
   // B's. Partial overlap (each holds commits the other lacks) has no
