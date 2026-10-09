@@ -3,3 +3,6 @@
 
 # Local planning for working sessions, not part of the plugin
 ROADMAP.md
+
+# Worktrees made with claude -w
+.claude/worktrees/
