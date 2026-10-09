@@ -7,7 +7,8 @@ import { gitOf } from '../hooks/git'
 import {
   ageOf,
   bandLinesOf,
-  CONTROLS_CELLS,
+  controlsCellsOf,
+  controlsOf,
   FRAME_MIN_COLUMNS,
   frameOf,
   lineWidthOf,
@@ -41,7 +42,7 @@ async function fixtureSnapshot(): Promise<Snapshot> {
 }
 
 function modelOf(snapshot: Snapshot | null, changes: Partial<BandModel> = {}): BandModel {
-  return { snapshot, problem: null, status: null, root: '/work', now: NOW, columns: 100, maxRows: 40, isHelpShown: false, ...changes }
+  return { snapshot, problem: null, status: null, root: '/work', now: NOW, columns: 100, maxRows: 40, isHelpShown: false, isCompact: false, ...changes }
 }
 
 const textOf = (line: Line | undefined): string => line?.segments.map(segment => segment.text).join('') ?? ''
@@ -90,7 +91,7 @@ describe('the band laid out', () => {
 
     for (let columns = 1; columns <= 160; columns += 1) {
       for (const line of bandLinesOf(modelOf(snapshot, { columns, status: 'release v0.4.1 pending', problem: 'boom' }))) {
-        const room = line.key === 'header' ? columns - CONTROLS_CELLS : columns
+        const room = line.key === 'header' ? columns - controlsCellsOf(controlsOf(columns, false, false)) : columns
 
         expect(lineWidthOf(line), `${line.key} at ${columns}`).toBeLessThanOrEqual(Math.max(room, 0))
       }
@@ -196,7 +197,7 @@ describe('the band laid out', () => {
 
     for (let columns = 1; columns <= 160; columns += 1) {
       for (const line of bandLinesOf(modelOf(snapshot, { columns, isHelpShown: true }))) {
-        const room = line.key === 'header' ? columns - CONTROLS_CELLS : columns
+        const room = line.key === 'header' ? columns - controlsCellsOf(controlsOf(columns, true, false)) : columns
 
         expect(lineWidthOf(line), `${line.key} at ${columns}`).toBeLessThanOrEqual(Math.max(room, 0))
       }
@@ -206,6 +207,35 @@ describe('the band laid out', () => {
     const narrow = bandLinesOf(modelOf(snapshot, { columns: 30, isHelpShown: true }))
 
     expect(narrow.slice(2, 4).map(textOf)).toEqual(['  ready', '    merges cleanly into main,'])
+  })
+
+  test('compact, the band is one line: the counts and what lands next', async () => {
+    const snapshot = await fixtureSnapshot()
+    const lines = bandLinesOf(modelOf(snapshot, { isCompact: true, columns: 200 }))
+
+    expect(lines.map(textOf)).toEqual([
+      'Worktree Radar · next → feat/parent · 4 ready · 2 needs rebase · 1 stacked · 1 in progress · 1 on hold · 2 cleanup',
+    ])
+
+    for (let columns = 1; columns <= 160; columns += 1) {
+      const [line, ...rest] = bandLinesOf(modelOf(snapshot, { columns, isCompact: true, problem: 'boom' }))
+
+      expect(rest).toEqual([])
+      expect(lineWidthOf(line as Line)).toBeLessThanOrEqual(Math.max(columns - controlsCellsOf(controlsOf(columns, false, true)), 0))
+    }
+
+    // The help still shows whole while compact
+    expect(bandLinesOf(modelOf(snapshot, { isCompact: true, isHelpShown: true })).length).toBeGreaterThan(10)
+  })
+
+  test('the controls say what a press does, and shorten on a narrow band', () => {
+    const labels = (columns: number, help: boolean, compact: boolean) =>
+      controlsOf(columns, help, compact).map(control => `${control.hotkey}: ${control.label}`)
+
+    expect(labels(120, false, false)).toEqual(['h: help', 'c: compact', 'x: exit'])
+    expect(labels(120, true, true)).toEqual(['h: back', 'c: expand', 'x: exit'])
+    expect(labels(60, false, false)).toEqual(['h: ?', 'c: -', 'x: ×'])
+    expect(controlsCellsOf(controlsOf(120, false, false))).toBe(27)
   })
 
   test('wraps words to a width, cutting only a word longer than a line', () => {

@@ -1,6 +1,6 @@
 import type { ElementTable, RenderElement } from 'claude-code'
 
-import type { Frame, Line } from './rows'
+import type { Control, Frame, Line } from './rows'
 
 /**
  * The elements the band draws with, from the table `$.ui.resolve(e)` hands
@@ -8,16 +8,10 @@ import type { Frame, Line } from './rows'
  */
 export type Ui = Pick<ElementTable<'terminal' | 'desktop'>, 'Box' | 'Text' | 'Button'>
 
-export const CLOSE_KEY = 'close'
-export const HELP_KEY = 'help'
-
 /**
- * What the band's controls do.
+ * What the band's controls do, by their keys.
  */
-export type BandActions = {
-  readonly toggleHelp: () => void
-  readonly close: () => void
-}
+export type BandActions = Readonly<Record<Control['key'], () => void>>
 
 /**
  * The frame's look: rounded, in the color of the prompt's own border, so
@@ -26,14 +20,15 @@ export type BandActions = {
 export const FRAME_STYLE = { borderStyle: 'round', borderColor: 'promptBorder', paddingX: 1 } as const
 
 /**
- * Draws the band's lines, one row each, with the help toggle (hotkey `h`)
- * and the close mark after the header, framed when the band is wide enough.
+ * Draws the band's lines, one row each, with the controls (`h: help`,
+ * `c: compact`, `x: exit`) after the header, framed when the band is wide
+ * enough.
  *
  * @param ui the surface's elements
  * @param lines the lines, laid out by `bandLinesOf` for the frame's room
  * @param columns the cells the band's tree is laid out in, frame included
  * @param frame the frame, from `frameOf`
- * @param isHelpShown whether the lines are the help
+ * @param controls the header's controls, from `controlsOf`
  * @param actions what the controls do
  * @returns the band's tree
  */
@@ -42,7 +37,7 @@ export function bandView(
   lines: readonly Line[],
   columns: number,
   frame: Frame,
-  isHelpShown: boolean,
+  controls: readonly Control[],
   actions: BandActions,
 ): RenderElement {
   const { Box, Text, Button } = ui
@@ -67,15 +62,17 @@ export function bandView(
           </Box>
           {at === 0 ? (
             <Box flexDirection="row" flexShrink={0} columnGap={1} marginLeft={1}>
-              <Button
-                key={HELP_KEY}
-                label={isHelpShown ? 'back' : 'help'}
-                hotkey="h"
-                plain
-                dimColor
-                onPress={actions.toggleHelp}
-              />
-              <Button key={CLOSE_KEY} label="×" plain role="dismiss" onPress={actions.close} />
+              {controls.map(control => (
+                <Button
+                  key={control.key}
+                  label={control.label}
+                  hotkey={control.hotkey}
+                  plain
+                  dimColor
+                  {...(control.key === 'exit' ? { role: 'dismiss' as const } : {})}
+                  onPress={actions[control.key]}
+                />
+              ))}
             </Box>
           ) : null}
         </Box>

@@ -119,10 +119,13 @@ the module otherwise:
   lines are laid out for the room inside it. The `[-]` beside the band is
   the engine's, in the five cells `bodyColumns` leaves out: a mod can
   neither move it into the frame nor hide it.
-- The header ends in two controls (`CONTROLS_CELLS`): `h: help`/`h: back`
-  (`helpShown`, `$.state`) and `×`. A hotkey works only while the band has
-  the keyboard (Ctrl+X Tab, a click); no digit hotkeys, as a bare digit in
-  an empty prompt presses a band Button.
+- The header ends in three controls (`controlsOf`, their width
+  `controlsCellsOf`): `h: help`/`back` (`helpShown`), `c: compact`/`expand`
+  (`compact`, both `$.state`) and `x: exit`; below `SHORT_CONTROLS_BELOW`
+  their labels shorten to one character. Compact, the band is the header
+  alone, `next →` first so a narrow band cuts the counts, not it. A hotkey
+  works only while the band has the keyboard (Ctrl+X Tab, a click); no digit
+  hotkeys, as a bare digit in an empty prompt presses a band Button.
 
 ## Carried over from cc-file-explorer
 

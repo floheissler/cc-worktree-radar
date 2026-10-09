@@ -43,11 +43,18 @@ Answer `y` to add the marketplace, then pick a scope.
 | `/radar unhold <branch>` | Lets it go again |
 | `/radar off` | Closes the radar |
 
-The band is framed like a panel. `h: help` in its header switches between
-the queue and a help that explains every lane, note and control; `×` closes
-the radar. Click them, or give the band the keyboard (Ctrl+X Tab) and press
-`h`. The `[-]` beside the band is Claude Code's own: it folds the band away
-(Ctrl+X Ctrl+A), and a mod cannot move it into the frame. It updates by itself while open: every few seconds the radar checks the
+The band is framed like a panel, with three controls in its header:
+
+| Control | Does |
+|---|---|
+| `h: help` | switches between the queue and a help that explains every lane, note and control |
+| `c: compact` | folds the radar into one line: what lands next, then the counts; `c: expand` brings the queue back |
+| `x: exit` | closes the radar, as `/radar` does |
+
+Click them, or give the band the keyboard (Ctrl+X Tab, or a click) and press
+the letter. On a band narrower than 90 columns the labels shorten to
+`h: ?`, `c: -` and `x: ×`. The `[-]` beside the band is Claude Code's own: it
+hides the band (Ctrl+X Ctrl+A), and a mod cannot move it into the frame. It updates by itself while open: every few seconds the radar checks the
 branch tips, the worktrees and the running Claude sessions, and reads the
 repository again once a change has settled.
 

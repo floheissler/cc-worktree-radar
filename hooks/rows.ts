@@ -53,6 +53,10 @@ export type BandModel = {
    * Whether the help stands in for the queue.
    */
   readonly isHelpShown: boolean
+  /**
+   * Whether the queue is folded into the header's one line.
+   */
+  readonly isCompact: boolean
 }
 
 export const LANE_LABELS: Readonly<Record<Lane, string>> = {
@@ -114,10 +118,57 @@ export const WIDE_COLUMNS = 64
 export const MEDIUM_COLUMNS = 40
 
 /**
- * Cells left at the header's end for its controls: a gap, the help toggle
- * (`h: help`), a gap and the close mark.
+ * One of the header's controls, drawn as its hotkey, a colon and its label
+ * (`h: help`).
  */
-export const CONTROLS_CELLS = 10
+export type Control = {
+  readonly key: 'help' | 'compact' | 'exit'
+  readonly hotkey: string
+  readonly label: string
+}
+
+/**
+ * Below this width the controls' labels shorten to one character each, so
+ * the header keeps room for the counts.
+ */
+export const SHORT_CONTROLS_BELOW = 90
+
+/**
+ * The header's controls: the help, the compact line and closing the radar,
+ * each labelled for what a press does now.
+ *
+ * @param columns the cells the band's lines take
+ * @param isHelpShown whether the help is shown
+ * @param isCompact whether the queue is folded into one line
+ * @returns the controls, in drawing order
+ */
+export function controlsOf(columns: number, isHelpShown: boolean, isCompact: boolean): Control[] {
+  const isShort = columns < SHORT_CONTROLS_BELOW
+
+  return [
+    { key: 'help', hotkey: 'h', label: isShort ? '?' : isHelpShown ? 'back' : 'help' },
+    { key: 'compact', hotkey: 'c', label: isShort ? (isCompact ? '+' : '-') : isCompact ? 'expand' : 'compact' },
+    { key: 'exit', hotkey: 'x', label: isShort ? '×' : 'exit' },
+  ]
+}
+
+/**
+ * The cells the controls take at the header's end: a gap before them, each
+ * `k: label`, a gap between two.
+ *
+ * @param controls the controls
+ * @returns their width in cells
+ */
+export function controlsCellsOf(controls: readonly Control[]): number {
+  return controls.reduce((sum, control) => sum + 1 + cellWidth(`${control.hotkey}: ${control.label}`), 0)
+}
+
+/**
+ * The cells the header's text may take beside the controls.
+ */
+function headerRoomOf(model: BandModel, columns: number): number {
+  return columns - controlsCellsOf(controlsOf(columns, model.isHelpShown, model.isCompact))
+}
 
 /**
  * What the frame around the band takes: a border and a cell of padding on
@@ -375,22 +426,38 @@ function headerOf(model: BandModel, snapshot: Snapshot | null, columns: number):
   const segments: Segment[] = [{ text: BAND_TITLE, bold: true }, { text: ` · ${repo}`, dim: true }]
 
   if (model.isHelpShown) {
-    return { key: 'header', segments: fitSegments([...segments, { text: ' · help', dim: true }], columns - CONTROLS_CELLS) }
+    return { key: 'header', segments: fitSegments([...segments, { text: ' · help', dim: true }], headerRoomOf(model, columns)) }
   }
 
-  if (snapshot !== null) {
-    segments.push({ text: ` → ${sanitize(snapshot.base.name)}`, dim: true })
-
-    for (const lane of Object.keys(LANE_LABELS) as Lane[]) {
-      const count = snapshot.branches.filter(branch => branch.lane === lane).length
-
-      if (count > 0) {
-        segments.push({ text: ' · ', dim: true }, { text: `${count} ${LANE_LABELS[lane]}`, color: LANE_COLORS[lane] })
-      }
-    }
+  if (snapshot === null) {
+    return { key: 'header', segments: fitSegments(segments, headerRoomOf(model, columns)) }
   }
 
-  return { key: 'header', segments: fitSegments(segments, columns - CONTROLS_CELLS) }
+  const counts: Segment[] = (Object.keys(LANE_LABELS) as Lane[]).flatMap(lane => {
+    const count = snapshot.branches.filter(branch => branch.lane === lane).length
+
+    return count === 0 ? [] : [{ text: ' · ', dim: true }, { text: `${count} ${LANE_LABELS[lane]}`, color: LANE_COLORS[lane] }]
+  })
+
+  // Compact, the header is the whole band: what lands next comes first, the
+  // part a narrow band cuts last
+  if (model.isCompact) {
+    const compact: Segment[] = [
+      { text: BAND_TITLE, bold: true },
+      { text: ' · ', dim: true },
+      ...(snapshot.next === null
+        ? [{ text: 'nothing ready', dim: true }]
+        : [{ text: 'next → ', dim: true }, { text: sanitize(snapshot.next), color: 'success' as const, bold: true }]),
+      ...(model.problem === null ? [] : [{ text: ' · ', dim: true }, { text: 'last read failed', color: 'error' as const }]),
+      ...counts,
+    ]
+
+    return { key: 'header', segments: fitSegments(compact, headerRoomOf(model, columns)) }
+  }
+
+  segments.push({ text: ` → ${sanitize(snapshot.base.name)}`, dim: true }, ...counts)
+
+  return { key: 'header', segments: fitSegments(segments, headerRoomOf(model, columns)) }
 }
 
 /**
@@ -452,13 +519,17 @@ export function bandLinesOf(model: BandModel): Line[] {
         key: 'header',
         segments: fitSegments(
           [...header.segments, { text: ' · ', dim: true }, { text, ...(model.problem === null ? { dim: true } : { color: 'error' as const }) }],
-          columns - CONTROLS_CELLS,
+          headerRoomOf(model, columns),
         ),
       },
     ]
   }
 
   const header = headerOf(model, snapshot, columns)
+
+  if (model.isCompact) {
+    return [header]
+  }
   const foot = footOf(model, snapshot, columns)
 
   if (snapshot.branches.length === 0) {
@@ -593,7 +664,8 @@ export function helpLinesOf(base: string, columns: number): Line[] {
       title: 'Controls',
       entries: [
         { term: { text: 'h' }, meaning: 'this help, and back; the band takes keys after ctrl+x tab or a click' },
-        { term: { text: '×' }, meaning: 'closes the radar, as /radar does' },
+        { term: { text: 'c' }, meaning: 'folds the radar into one line: what lands next, then the counts' },
+        { term: { text: 'x' }, meaning: 'exits the radar, as /radar does' },
         { term: { text: '/radar hold <branch>' }, meaning: 'parks a branch; /radar unhold <branch> lets it go' },
       ],
     },

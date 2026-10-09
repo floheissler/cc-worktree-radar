@@ -220,6 +220,10 @@ declare module 'claude-code' {
        */
       helpShown: boolean
       /**
+       * Whether the queue is folded into the header's one line.
+       */
+      compact: boolean
+      /**
        * Branches found due a rebase, by name, at the tip they were due on:
        * while one is in progress afterwards, it is being rebased, and the
        * branches it conflicts with wait for it.

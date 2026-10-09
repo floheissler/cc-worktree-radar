@@ -131,7 +131,8 @@ describe('/radar', () => {
       const drawn = await narrow.drawn()
 
       expect((drawn as { props: Record<string, unknown> }).props.borderStyle).toBeUndefined()
-      expect(await narrow.find({ type: 'Text', text: /^Worktree/ })).toBeDefined()
+      // Three controls leave a 20-column band a few cells of title
+      expect(await narrow.find({ type: 'Text', text: /^Wor/ })).toBeDefined()
       await narrow.unmount()
     }
   })
@@ -174,7 +175,7 @@ describe('/radar', () => {
     expect(await bandText($)).toContain('Lanes')
   })
 
-  test('the close mark closes it', async ($, on) => {
+  test('c folds the band into one line and back', async ($, on) => {
     const { clock } = worldOf(on)
 
     await $.command.run(RADAR)
@@ -182,7 +183,39 @@ describe('/radar', () => {
 
     const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
 
-    await ui.press({ key: 'close' })
+    await ui.press({ key: 'compact' })
+    await settled(clock)
+    await ui.unmount()
+
+    const compact = await bandText($)
+
+    expect(compact.some(text => /^Worktree Radar · next → feat\/parent · 4 ready/.test(text))).toBe(true)
+    expect(compact.some(text => /^ 1 feat\/parent/.test(text))).toBe(false)
+
+    const back = await $.ui.mount({ ...BAND, surface: 'terminal' })
+
+    expect(await back.find({ key: 'compact' })).toMatchObject({ props: { label: 'expand' } })
+    await back.press({ key: 'compact' })
+    await settled(clock)
+    await back.unmount()
+
+    expect((await bandText($)).some(text => /^ 1 feat\/parent\s+ready/.test(text))).toBe(true)
+  })
+
+  test('x exits the radar', async ($, on) => {
+    const { clock } = worldOf(on)
+
+    await $.command.run(RADAR)
+    await settled(clock)
+
+    const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
+
+    expect((await ui.findAll({ type: 'Button' })).map(found => [found.props.hotkey, found.props.label])).toEqual([
+      ['h', 'help'],
+      ['c', 'compact'],
+      ['x', 'exit'],
+    ])
+    await ui.press({ key: 'exit' })
     await settled(clock)
     await ui.unmount()
 

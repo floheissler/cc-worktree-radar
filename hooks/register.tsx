@@ -8,7 +8,7 @@ import type { Host, RadarOptions } from './host'
 import Limits from './limits'
 import { BAND_TITLE, COMMAND_DESCRIPTION, COMMAND_HINT } from './names'
 import { createRadar, type Radar } from './radar'
-import { bandLinesOf, frameOf } from './rows'
+import { bandLinesOf, controlsOf, frameOf } from './rows'
 import { clipChars, messageOf, sanitize } from './text'
 import { TOOL_DESCRIPTION, TOOL_INPUT_SCHEMA, toolJsonOf, toolRequestOf } from './tool'
 import { bandView } from './view'
@@ -23,6 +23,7 @@ const PROBLEM = atom({ plugin: 'worktree-radar', key: 'problem' } as const, null
 const NOTES = atom({ plugin: 'worktree-radar', key: 'notes' } as const, {})
 const STATUS = atom({ plugin: 'worktree-radar', key: 'status' } as const, null)
 const HELP_SHOWN = atom({ plugin: 'worktree-radar', key: 'helpShown' } as const, false)
+const COMPACT = atom({ plugin: 'worktree-radar', key: 'compact' } as const, false)
 const DUE_MARKS = atom({ plugin: 'worktree-radar', key: 'dueMarks' } as const, {})
 
 /**
@@ -104,6 +105,12 @@ function hostOf($: EngineInterface, options: RadarOptions): Host {
         get: () => read($, HELP_SHOWN),
         set: async fn => {
           await update($, HELP_SHOWN, fn)
+        },
+      },
+      compact: {
+        get: () => read($, COMPACT),
+        set: async fn => {
+          await update($, COMPACT, fn)
         },
       },
       dueMarks: {
@@ -327,11 +334,12 @@ export const register: Register = (on, pluginOptions) => {
       return next(e)
     }
 
-    const [snapshot, problem, status, isHelpShown, now] = await Promise.all([
+    const [snapshot, problem, status, isHelpShown, isCompact, now] = await Promise.all([
       host.state.snapshot.get(),
       host.state.problem.get(),
       host.state.status.get(),
       host.state.helpShown.get(),
+      host.state.compact.get(),
       host.now(),
     ])
     const columns = e.props.bodyColumns
@@ -345,13 +353,18 @@ export const register: Register = (on, pluginOptions) => {
       columns: frame.columns,
       maxRows: frame.maxRows,
       isHelpShown,
+      isCompact,
     })
+    const controls = controlsOf(frame.columns, isHelpShown, isCompact)
 
-    return bandView($.ui.resolve(e), lines, columns, frame, isHelpShown, {
-      toggleHelp: () => {
+    return bandView($.ui.resolve(e), lines, columns, frame, controls, {
+      help: () => {
         void hostOf($, options).state.helpShown.set(shown => !shown)
       },
-      close: () => {
+      compact: () => {
+        void hostOf($, options).state.compact.set(compact => !compact)
+      },
+      exit: () => {
         void closeRadar(hostOf($, options), radar)
       },
     })
