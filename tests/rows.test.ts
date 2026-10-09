@@ -83,6 +83,8 @@ describe('the band laid out', () => {
     expect(textOf(lines.at(-1))).toBe(
       'Worktree Radar · work [main] · 4 ready · 2 needs rebase · 1 stacked · 1 in progress · 1 on hold · 2 cleanup · land next → feat/parent',
     )
+    // The base in the orange the owner's status line names a branch with
+    expect(lines.at(-1)?.segments.find(segment => segment.text === '[main]')).toEqual({ text: '[main]', color: '#ff8700' })
   })
 
   test('every row lines up under the column names; the branch column fits the longest name', async () => {

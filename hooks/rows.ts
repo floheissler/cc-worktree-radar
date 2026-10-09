@@ -1,4 +1,4 @@
-import type { ThemeKey } from 'claude-code'
+import type { Color, ThemeKey } from 'claude-code'
 
 import type { BranchInfo, Lane, Snapshot } from '../types'
 
@@ -16,7 +16,11 @@ import { cellWidth, padEnd, sanitize, truncateEnd, truncateMiddle } from './text
  */
 export type Segment = {
   readonly text: string
-  readonly color?: ThemeKey
+  /**
+   * A theme key, which follows the person's theme; a raw color only where a
+   * constant says why.
+   */
+  readonly color?: Color
   readonly dim?: boolean
   readonly bold?: boolean
   readonly italic?: boolean
@@ -153,6 +157,14 @@ const BRANCH_MIN_CELLS = 6
 const DETAIL_SHARE = 0.6
 const DETAIL_MIN_CELLS = 6
 const COMMENT_MIN_CELLS = 16
+
+/**
+ * The base branch's color in the status line: xterm's orange 208, the one
+ * the owner's own status line names the branch with, so the two agree. A
+ * raw color, as no theme key holds it (`claude`, Claude's orange, marks a
+ * comment); it reads on a dark and a light background alike.
+ */
+const BASE_COLOR = '#ff8700'
 
 /**
  * What marks a comment as Claude's words: the mark Claude Code draws its
@@ -626,7 +638,8 @@ function foldedLineOf(lane: Lane, branches: readonly BranchInfo[], columns: numb
 function placeOf(model: BandModel, snapshot: Snapshot): Segment[] {
   return [
     { text: sanitize(nameOf(snapshot.repo || model.root)) },
-    { text: ` [${sanitize(snapshot.base.name)}]`, dim: true },
+    { text: ' ' },
+    { text: `[${sanitize(snapshot.base.name)}]`, color: BASE_COLOR },
   ]
 }
 

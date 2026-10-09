@@ -144,6 +144,10 @@ the module otherwise:
 - The tool hook matches its tool by a pattern (`/^mcp__worktree-radar__radar$/`):
   the laid MCP types do not list a plugin's own tool, so a literal fails
   `tsc`.
+- Colors are theme keys, so the band follows the person's theme, with one
+  exception: the base (`[main]`) in the status line is xterm's orange 208
+  (`BASE_COLOR`, `#ff8700`), as the owner's own status line names the
+  branch, which no theme key holds.
 - Lanes are colored with theme keys (`LANE_COLORS`), and every line is
   fitted to `bodyColumns` in cells; `rows.test.ts` sweeps 1–160 columns,
   the queue and the help alike.
