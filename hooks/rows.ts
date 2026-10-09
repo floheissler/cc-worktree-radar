@@ -677,7 +677,12 @@ export function helpLinesOf(base: string, columns: number): Line[] {
   const isSideBySide = columns >= SIDE_BY_SIDE_COLUMNS
   const lines: Line[] = []
 
-  for (const section of sections) {
+  sections.forEach((section, at) => {
+    // An empty row between two sections; a space, so the row keeps its height
+    if (at > 0) {
+      lines.push({ key: `help:gap:${section.title}`, segments: [{ text: ' ' }] })
+    }
+
     lines.push({ key: `help:${section.title}`, segments: fitSegments([{ text: section.title, bold: true }], columns) })
 
     for (const entry of section.entries) {
@@ -703,7 +708,7 @@ export function helpLinesOf(base: string, columns: number): Line[] {
         lines.push({ key: `${key}:${at}`, segments: fitSegments([{ text: '    ' }, { text, dim: true }], columns) })
       })
     }
-  }
+  })
 
   return lines
 }

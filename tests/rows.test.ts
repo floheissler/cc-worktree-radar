@@ -190,6 +190,13 @@ describe('the band laid out', () => {
 
     expect(textOf(lines[0])).toBe('Worktree Radar · work · help')
     expect(textOf(lines[1])).toBe('Lanes')
+
+    // An empty row before each section after the first
+    for (const title of ['On a row', 'Controls']) {
+      const at = lines.findIndex(line => textOf(line) === title)
+
+      expect(textOf(lines[at - 1]), title).toBe(' ')
+    }
     expect(lines[2]?.segments[0]).toMatchObject({ text: expect.stringMatching(/^ {2}ready +$/), color: 'success' })
     expect(textOf(lines[2])).toMatch(/^ {2}ready +merges cleanly into main, nothing uncommitted/)
     expect(lines.some(line => line.segments.some(segment => segment.text.trim() === 'needs rebase' && segment.color === 'error'))).toBe(true)
