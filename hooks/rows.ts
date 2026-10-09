@@ -389,10 +389,17 @@ export function fitSegments(segments: readonly Segment[], cells: number): Segmen
  * @param base the base branch's name
  * @returns the note's runs, sanitized
  */
-export function noteOf(branch: BranchInfo, base: string): Segment[] {
+export function noteOf(branch: BranchInfo, base: string, ranks: ReadonlyMap<string, number> = new Map()): Segment[] {
   const parts: Segment[] = []
   const tree = branch.worktree
   const name = (text: string): string => sanitize(text)
+  // Another branch as a note names it: with its place in the landing order
+  // when it has one (`#1 feat/x`)
+  const ref = (other: string): string => {
+    const rank = ranks.get(other)
+
+    return rank === undefined ? name(other) : `#${rank} ${name(other)}`
+  }
 
   if (branch.note !== null) {
     parts.push({ text: name(branch.note), color: 'remember' })
@@ -406,7 +413,7 @@ export function noteOf(branch: BranchInfo, base: string): Segment[] {
 
       // Ready already says it merges cleanly: the note only adds what else
       if (branch.breaks.length > 0) {
-        parts.push({ text: `forces a rebase of ${name(shortList(branch.breaks.map(broken => broken.branch), 1))}`, dim: true })
+        parts.push({ text: `forces a rebase of ${shortList(branch.breaks.map(broken => ref(broken.branch)), 1)}`, dim: true })
       }
 
       break
@@ -414,12 +421,12 @@ export function noteOf(branch: BranchInfo, base: string): Segment[] {
       parts.push({ text: `conflicts: ${name(shortList(branch.conflicts ?? [], 1))}`, dim: true })
       parts.push(
         (branch.waitsFor?.length ?? 0) > 0
-          ? { text: `rebase after ${name(shortList(branch.waitsFor ?? [], 1))}`, dim: true }
+          ? { text: `rebase after ${shortList((branch.waitsFor ?? []).map(ref), 1)}`, dim: true }
           : { text: 'rebase due', color: 'error' },
       )
       break
     case 'STACKED':
-      parts.push({ text: `on ${name(branch.stackedOn ?? '')}`, dim: true })
+      parts.push({ text: `lands after ${ref(branch.stackedOn ?? '')}`, dim: true })
       break
     case 'IN_PROGRESS': {
       const busy = tree?.sessions.find(session => session.status !== 'idle')
@@ -466,12 +473,21 @@ export function noteOf(branch: BranchInfo, base: string): Segment[] {
  * @param table the queue's columns
  * @param columns the cells the row may take
  * @param nowSeconds now, in seconds since the epoch
+ * @param ranks the landing order's places, by branch
  * @returns the row
  */
-export function rowOf(branch: BranchInfo, base: string, table: TableColumns, columns: number, nowSeconds: number): Line {
-  const rank = branch.rank === null ? '-' : String(branch.rank)
+export function rowOf(
+  branch: BranchInfo,
+  base: string,
+  table: TableColumns,
+  columns: number,
+  nowSeconds: number,
+  ranks: ReadonlyMap<string, number> = new Map(),
+): Line {
+  // A branch out of the landing order has no place in it: the cell stays empty
+  const rank = branch.rank === null ? '' : String(branch.rank)
   const segments: Segment[] = [
-    { text: rank.padStart(RANK_CELLS - 1).padEnd(RANK_CELLS), bold: branch.rank !== null, dim: branch.rank === null },
+    { text: rank.padStart(RANK_CELLS - 1).padEnd(RANK_CELLS), bold: true },
     { text: padEnd(truncateMiddle(sanitize(branch.name), table.branch), table.branch) },
     { text: ' '.repeat(GAP_CELLS) },
     { text: padEnd(table.labels[branch.lane], table.lane), color: LANE_COLORS[branch.lane] },
@@ -487,7 +503,7 @@ export function rowOf(branch: BranchInfo, base: string, table: TableColumns, col
   }
 
   if (table.hasNote) {
-    segments.push({ text: ' '.repeat(GAP_CELLS) }, ...noteOf(branch, base))
+    segments.push({ text: ' '.repeat(GAP_CELLS) }, ...noteOf(branch, base, ranks))
   }
 
   return { key: `row:${branch.name}`, segments: fitSegments(segments, columns) }
@@ -763,6 +779,7 @@ export function bandLinesOf(model: BandModel): Line[] {
     }
   }
 
+  const ranks = new Map(snapshot.branches.flatMap(branch => (branch.rank === null ? [] : [[branch.name, branch.rank] as const])))
   const table = tableColumnsOf(
     columns,
     snapshot.branches.filter(branch => !folded.has(branch.lane)).map(branch => sanitize(branch.name)),
@@ -779,7 +796,7 @@ export function bandLinesOf(model: BandModel): Line[] {
     if (folded.has(lane)) {
       lines.push(foldedLineOf(lane, inLane, columns))
     } else {
-      lines.push(...inLane.map(branch => rowOf(branch, snapshot.base.name, table, columns, nowSeconds)))
+      lines.push(...inLane.map(branch => rowOf(branch, snapshot.base.name, table, columns, nowSeconds, ranks)))
     }
   }
 
@@ -857,11 +874,16 @@ export function helpLinesOf(base: string, columns: number): Line[] {
     {
       title: 'On a row',
       entries: [
-        { term: { text: '1 2 3' , bold: true }, meaning: `the order to land the ready branches in: stack parents first, then whichever forces the least rebase work on the others, then whichever finished first` },
+        {
+          term: { text: '1 2 3', bold: true },
+          meaning:
+            'the order to land the ready branches in: stack parents first, then whichever forces the least rebase work on the others, then whichever finished first. A branch without a number cannot land yet: its lane and note say why',
+        },
         { term: { text: '+3' }, meaning: `commits the branch has that ${onto} lacks` },
         { term: { text: '5m' }, meaning: 'since its last commit' },
         { term: { text: 'rebase due', color: 'error' }, meaning: 'rebase it now: nothing that lands before it still conflicts with it' },
-        { term: { text: 'rebase after X' }, meaning: 'X lands first and conflicts with it too; a rebase now would have to be done again' },
+        { term: { text: 'rebase after #2 X' }, meaning: 'X lands first and conflicts with it too; a rebase now would have to be done again' },
+        { term: { text: 'lands after #1 X' }, meaning: 'stacked on X: it lands once X has landed' },
         { term: { text: 'forces a rebase of X' }, meaning: 'landing this branch makes X conflict' },
         { term: { text: 'X stacked on it' }, meaning: 'X holds this branch: this one lands first' },
         { term: { text: `landed in ${onto}` }, meaning: `its work reached ${onto} through a merge` },

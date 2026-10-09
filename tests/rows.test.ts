@@ -69,8 +69,13 @@ describe('the band laid out', () => {
       'foot',
     ])
     expect(textOf(lines[1])).toMatch(/^ 1 feat\/parent\s+ready\s+\+1 +\d+[smhd]  feat\/child stacked on it$/)
-    expect(textOf(lines[5])).toMatch(/^ - feat\/conflict2\s+needs rebase\s+\+1 +\d+[smhd]  conflicts: a\.txt · rebase after feat\/ready-a/)
-    expect(textOf(lines.find(line => line.key === 'row:chore/merged'))).toMatch(/^ - chore\/merged\s+cleanup +nothing beyond main$/)
+    // Out of the landing order, the # cell is empty and the note names the
+    // ranked branch it waits on by its place
+    expect(textOf(lines[5])).toMatch(/^ {3}feat\/conflict2\s+needs rebase\s+\+1 +\d+[smhd]  conflicts: a\.txt · rebase after #2 feat\/ready-a$/)
+    expect(textOf(lines.find(line => line.key === 'row:feat/child'))).toMatch(/^ {3}feat\/child\s+stacked\s+\+2 +\d+[smhd]  lands after #1 feat\/parent$/)
+    expect(textOf(lines.find(line => line.key === 'row:feat/big'))).toMatch(/forces a rebase of #4 fix\/small$/)
+    expect(textOf(lines.find(line => line.key === 'row:feat/conflict'))).toMatch(/rebase after feat\/conflict2$/)
+    expect(textOf(lines.find(line => line.key === 'row:chore/merged'))).toMatch(/^ {3}chore\/merged\s+cleanup +nothing beyond main$/)
     expect(textOf(lines.at(-1))).toMatch(
       /^next → feat\/parent +Worktree Radar · work → main · 4 ready · 2 needs rebase · 1 stacked · 1 in progress · 1 on hold · 2 cleanup$/,
     )
@@ -133,7 +138,7 @@ describe('the band laid out', () => {
     const snapshot = await fixtureSnapshot()
 
     expect(textOf(bandLinesOf(modelOf(snapshot, { columns: 50 }))[1])).toMatch(/^ 1 feat\/parent\s+ready +\d+[smhd]  feat\/child/)
-    expect(textOf(bandLinesOf(modelOf(snapshot, { columns: 30 }))[5])).toMatch(/^ - feat\/conflict2\s+rebase\s*$/)
+    expect(textOf(bandLinesOf(modelOf(snapshot, { columns: 30 }))[5])).toMatch(/^ {3}feat\/conflict2\s+rebase\s*$/)
   })
 
   test('folds the lanes that need nobody when rows run short', async () => {
