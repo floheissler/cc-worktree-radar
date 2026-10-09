@@ -1,0 +1,22 @@
+{
+  "name": "worktree-radar",
+  "displayName": "Worktree Radar",
+  "version": "0.1.0",
+  "description": "A live radar of your parallel branches and worktrees above the prompt: which merge cleanly, which conflict, which are stacked, which a Claude session is still working on, and the order to land them. Read-only: it never merges, rebases or moves a ref.",
+  "author": {
+    "name": "Flo Heissler"
+  },
+  "homepage": "https://github.com/floheissler/cc-worktree-radar",
+  "repository": "https://github.com/floheissler/cc-worktree-radar",
+  "supportUrl": "https://github.com/floheissler/cc-worktree-radar/issues",
+  "license": "MIT",
+  "keywords": [
+    "git",
+    "worktree",
+    "branches",
+    "merge",
+    "parallel",
+    "sessions",
+    "mod"
+  ]
+}

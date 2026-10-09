@@ -1,0 +1,14 @@
+{
+  "name": "cc-worktree-radar",
+  "description": "The worktree-radar mod for Claude Code: a live view of your parallel branches and worktrees above the prompt",
+  "owner": {
+    "name": "Flo Heissler"
+  },
+  "plugins": [
+    {
+      "name": "worktree-radar",
+      "source": "./",
+      "description": "A live radar of your parallel branches and worktrees above the prompt: which merge cleanly, which conflict, which are stacked, which a Claude session is still working on, and the order to land them. Read-only: it never merges, rebases or moves a ref."
+    }
+  ]
+}

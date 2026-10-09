@@ -1,0 +1,4 @@
+{
+  "description": "The radar: /radar and its band above the prompt",
+  "modules": ["./register.tsx"]
+}
