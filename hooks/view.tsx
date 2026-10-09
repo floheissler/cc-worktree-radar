@@ -22,9 +22,7 @@ export const FRAME_STYLE = { borderStyle: 'round', borderColor: 'promptBorder', 
 /**
  * Draws the band's lines, one row each, with the controls (`h: help`,
  * `c: compact`, `x: exit`) after the first, framed when the band is wide
- * enough. Framed, the divider reaches over the padding to the frame's sides:
- * Claude Code draws its border over anything laid on it, so the line meets
- * the border and does not cross it.
+ * enough.
  *
  * @param ui the surface's elements
  * @param lines the lines, laid out by `bandLinesOf` for the frame's room
@@ -59,16 +57,6 @@ export function bandView(
     <Box flexDirection="column" width={columns} {...(frame.isFramed ? FRAME_STYLE : {})}>
       {lines.map((line, at) => (
         <Box key={line.key} flexDirection="row" width={frame.columns}>
-          {frame.isFramed && line.key === 'divider' ? (
-            <Box key="reach-left" position="absolute" left={-1}>
-              <Text color={FRAME_STYLE.borderColor}>─</Text>
-            </Box>
-          ) : null}
-          {frame.isFramed && line.key === 'divider' ? (
-            <Box key="reach-right" position="absolute" right={-1}>
-              <Text color={FRAME_STYLE.borderColor}>─</Text>
-            </Box>
-          ) : null}
           <Box flexGrow={1} flexShrink={1}>
             <Text wrap="truncate-end">{runs(line.segments)}</Text>
           </Box>

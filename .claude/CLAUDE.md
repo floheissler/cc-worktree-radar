@@ -122,10 +122,12 @@ the module otherwise:
   drops ahead and shortens the lane labels; narrow keeps `#`, branch and
   lane. A ready row's note says only what else there is (a stack on it, a
   rebase it forces): "merges cleanly" is what ready means. Its first row names the columns (`columnHeaderOf`), the
-  controls at its end. Under a divider (`dividerOf`, reaching the frame's
-  sides over the padding), the foot is a status line read left to right
-  (`statusLayoutsOf`): the title, `repo [base]`, the counts,
-  `land next →`; messages (a caller's status, what to know) right-aligned.
+  controls at its end. Under the rows, the foot is a status line hung from
+  a `╰` in the `#` column (`FOOT_HOOK`), its text in the branch column,
+  read left to right (`statusLayoutsOf`): the title, `repo [base]`, the
+  counts, `land next →`; messages (a caller's status, what to know)
+  right-aligned. A divider across the band above it was tried and dropped:
+  it did not look good.
   Short of room it gives up, in order, the long lane labels, the title,
   the place and the counts; a message may push out the labels
   and the title (`MESSAGE_OUTRANKS`), never more. Compact, the band is that

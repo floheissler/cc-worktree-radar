@@ -103,7 +103,7 @@ describe('/radar', () => {
 
       expect(texts.some(text => /^ # BRANCH +LANE/.test(text))).toBe(true)
       expect(texts.some(text => /^ 1 feat\/parent\s+ready/.test(text))).toBe(true)
-      expect(texts.some(text => /^Worktree Radar · work \[main\] · 4 ready .* · land next → feat\/parent$/.test(text))).toBe(true)
+      expect(texts.some(text => /^ ╰ Worktree Radar · work \[main\] · 4 ready .* · land next → feat\/parent$/.test(text))).toBe(true)
     }
 
     await $.command.run(RADAR)
