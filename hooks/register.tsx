@@ -502,7 +502,8 @@ export const register: Register = (on, pluginOptions) => {
     })
     const controls = controlsOf(frame.columns, isHelpShown, isCompact)
 
-    return bandView($.ui.resolve(e), lines, columns, frame, controls, {
+    // Compact, the band is its status line; the help still shows whole
+    return bandView($.ui.resolve(e), lines, columns, frame, isCompact && !isHelpShown, controls, {
       help: () => {
         void hostOf($, options).state.helpShown.set(shown => !shown)
       },

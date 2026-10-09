@@ -67,7 +67,6 @@ describe('the band laid out', () => {
       'row:feat/clean',
       'row:feat/landed',
       'row:chore/merged',
-      'divider',
       'foot',
     ])
     expect(textOf(lines[1])).toMatch(/^ 1 feat\/parent\s+ready\s+\+1 +\d+[smhd]  feat\/child stacked on it$/)
@@ -78,8 +77,9 @@ describe('the band laid out', () => {
     expect(textOf(lines.find(line => line.key === 'row:feat/big'))).toMatch(/forces a rebase of #4 fix\/small$/)
     expect(textOf(lines.find(line => line.key === 'row:feat/conflict'))).toMatch(/rebase after feat\/conflict2$/)
     expect(textOf(lines.find(line => line.key === 'row:chore/merged'))).toMatch(/^ - chore\/merged\s+cleanup +nothing beyond main$/)
-    // A dotted, dim rule, fainter than the frame
-    expect(lines.at(-2)?.segments).toEqual([{ text: '┄'.repeat(140), dim: true }])
+    // No rule: the status line follows the last row, and the frame tells
+    // them apart (view.tsx draws it under the frame)
+    expect(lines.at(-2)?.key).toBe('row:chore/merged')
     expect(textOf(lines.at(-1))).toBe(
       'Worktree Radar · work [main] · 4 ready · 2 needs rebase · 1 stacked · 1 in progress · 1 on hold · 2 cleanup · land next → feat/parent',
     )
@@ -188,7 +188,6 @@ describe('the band laid out', () => {
       'fold:IN_PROGRESS',
       'row:feat/clean',
       'fold:CLEANUP',
-      'divider',
       'foot',
     ])
     expect(textOf(lines[8])).toBe('   in progress (3): feat/wip, feat/w2, feat/w3')
@@ -233,7 +232,6 @@ describe('the band laid out', () => {
 
     expect(empty.map(textOf)).toEqual([
       'no branches besides main',
-      '┄'.repeat(100),
       'Worktree Radar · work [main] · nothing ready to land',
     ])
   })

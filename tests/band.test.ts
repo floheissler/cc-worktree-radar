@@ -157,11 +157,16 @@ describe('/radar', () => {
 
     for (const surface of ['terminal', 'desktop'] as const) {
       const wide = await $.ui.mount({ ...BAND, surface })
+      const frame = await wide.find({ key: 'frame' })
+      const status = await wide.find({ key: 'status' })
 
-      expect(await wide.drawn()).toMatchObject({
-        type: 'Box',
-        props: { borderStyle: 'round', borderColor: 'promptBorder', paddingX: 1, width: 135 },
-      })
+      // The table in the frame, the status line under it, lined up with the
+      // table's text
+      expect(frame).toMatchObject({ type: 'Box', props: { borderStyle: 'round', borderColor: 'promptBorder', paddingX: 1, width: 135 } })
+      expect(frame?.text).toMatch(/feat\/parent/)
+      expect(frame?.text).not.toMatch(/land next/)
+      expect(status).toMatchObject({ type: 'Box', props: { paddingX: 2, width: 135 } })
+      expect(status?.text).toMatch(/^Worktree Radar · .* · land next → feat\/parent$/)
       await wide.unmount()
 
       const narrow = await $.ui.mount({ ...BAND, surface, props: { ...BAND.props, bodyColumns: 20 } })
@@ -227,6 +232,14 @@ describe('/radar', () => {
 
     expect(compact.some(text => /^work \[main\] · 4 ready .* · land next → feat\/parent$/.test(text))).toBe(true)
     expect(compact.some(text => /^ 1 feat\/parent/.test(text))).toBe(false)
+
+    // Compact, the panel goes: the status line alone, where it sits under it
+    const folded = await $.ui.mount({ ...BAND, surface: 'terminal' })
+
+    expect(await folded.find({ key: 'frame' })).toBeUndefined()
+    // An empty row above it, as the frame's top edge keeps the band apart
+    expect(await folded.find({ key: 'line' })).toMatchObject({ props: { paddingX: 2, marginTop: 1, width: 135 } })
+    await folded.unmount()
 
     const back = await $.ui.mount({ ...BAND, surface: 'terminal' })
 

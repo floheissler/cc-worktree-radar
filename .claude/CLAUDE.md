@@ -192,18 +192,20 @@ the module otherwise:
   before, the same grey as a comment. A caller's comment used to lead the note, in blue and
   joined by ` · `; the owner could not tell where it ended and the radar's
   words began. The caller's status line stays a blue badge, unquoted: it is
-  a status, not a comment. Under a dotted dim rule (`dividerOf`, inside the
-  padding), the foot is a status line read left to right
-  (`statusLayoutsOf`): the title, `repo [base]`, the counts,
-  `land next →`; messages (a caller's status, what to know) right-aligned.
-  Short of room it gives up, in order, the long lane labels, the title,
-  the place and the counts; a message may push out the labels
-  and the title (`MESSAGE_OUTRANKS`), never more. Compact, the band is that
-  status line alone. `fitWhole` keeps whole pieces where a cut one would
-  read wrong. Other dividers were tried and dropped: a solid dim rule, the
-  rule in the frame's color reaching its sides (it split the panel in two,
-  without joints, as a mod cannot draw on the border) and a `╰` hook before
-  the status line, which read as a stray corner.
+  a status, not a comment. Under the frame, not in it (`view.tsx`), the
+  foot is a status line read left to right (`statusLayoutsOf`): the title,
+  `repo [base]`, the counts, `land next →`; messages (a caller's status,
+  what to know) right-aligned. Short of room it gives up, in order, the long
+  lane labels, the title, the place and the counts; a message may push out
+  the labels and the title (`MESSAGE_OUTRANKS`), never more. Compact, the
+  frame goes and the band is that status line alone, an empty row above it
+  so it stands apart from Claude Code's spinner and tips as the frame's top
+  edge does. `fitWhole` keeps whole
+  pieces where a cut one would read wrong. Dividers inside the frame were
+  tried and dropped for the frame itself: a solid dim rule, a dotted dim
+  rule, the rule in the frame's color reaching its sides (it split the panel
+  in two, without joints, as a mod cannot draw on the border) and a `╰` hook
+  before the status line, which read as a stray corner.
 - The frame's border is Claude Code's, drawn over anything a mod lays on it:
   checked live on 2.1.295, a title placed with `position: "absolute"` over
   the top edge did not show, and overlays reach the padding cells only. So
@@ -212,7 +214,11 @@ the module otherwise:
   which works) and dropped by the owner's taste.
 - The band is framed (`frameOf`: a rounded border in `promptBorder` and a
   cell of padding, 4 cells and 2 rows) from `FRAME_MIN_COLUMNS` on; the
-  lines are laid out for the room inside it. The `[-]` beside the band is
+  lines are laid out for the room inside it. The frame holds the table (or
+  the help); the status line sits under it and the compact line has none,
+  both kept `INSET` cells from the band's sides, so every line starts and
+  ends where the table's text does. Narrower, there is no frame and the
+  lines follow one another. The `[-]` beside the band is
   the engine's, in the five cells `bodyColumns` leaves out: a mod can
   neither move it into the frame nor hide it.
 - The header ends in three controls (`controlsOf`, their width

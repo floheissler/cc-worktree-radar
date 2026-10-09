@@ -853,15 +853,6 @@ function messagesOf(model: BandModel, snapshot: Snapshot): Segment[] {
   return messages
 }
 
-/**
- * The rule between the table and the foot: dotted, dim and inside the
- * padding, so it reads fainter than the frame and meets neither of its
- * sides.
- */
-function dividerOf(columns: number): Line {
-  return { key: 'divider', segments: [{ text: '┄'.repeat(Math.max(columns, 0)), dim: true }] }
-}
-
 function nameOf(path: string): string {
   const parts = path.split(/[\\/]/).filter(part => part !== '')
 
@@ -898,7 +889,6 @@ export function bandLinesOf(model: BandModel): Line[] {
         key: 'empty',
         segments: fitSegments([{ text: `no branches besides ${sanitize(snapshot.base.name)}`, dim: true }], headerRoomOf(model, columns)),
       },
-      dividerOf(columns),
       footOf(model, snapshot, columns),
     ]
   }
@@ -907,8 +897,8 @@ export function bandLinesOf(model: BandModel): Line[] {
 
   const nowSeconds = Math.floor(model.now / 1000)
   const folded = new Set<Lane>()
-  // The column names, the divider and the foot take a row each
-  const room = Math.max(model.maxRows - 3, 1)
+  // The column names and the foot take a row each
+  const room = Math.max(model.maxRows - 2, 1)
   const rowsWith = (): number =>
     snapshot.branches.filter(branch => !folded.has(branch.lane)).length +
     [...folded].filter(lane => snapshot.branches.some(branch => branch.lane === lane)).length
@@ -948,7 +938,7 @@ export function bandLinesOf(model: BandModel): Line[] {
     }
   }
 
-  lines.push(dividerOf(columns), foot)
+  lines.push(foot)
 
   return lines
 }
