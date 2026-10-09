@@ -11,8 +11,8 @@ and the order to land them in.
 │  # BRANCH         LANE        AHEAD  AGE  NOTE                      h: help c: compact x: exit │
 │  1 feat/checkout  ready          +4  12m                                                       │
 │  2 fix/totals     ready          +1   3m  forces a rebase of feat/coupons                      │
-│    feat/coupons   needs rebase   +6  20m  conflicts: cart.ts · rebase after #2 fix/totals      │
-│    feat/search    in progress    +2   1m  search-worker busy                                   │
+│  - feat/coupons   needs rebase   +6  20m  conflicts: cart.ts · rebase after #2 fix/totals      │
+│  - feat/search    in progress    +2   1m  search-worker busy                                   │
 │ next → feat/checkout   Worktree Radar · shop → main · 2 ready · 1 needs rebase · 1 in progress │
 ╰────────────────────────────────────────────────────────────────────────────────────────────────╯
 ```

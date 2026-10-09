@@ -484,10 +484,10 @@ export function rowOf(
   nowSeconds: number,
   ranks: ReadonlyMap<string, number> = new Map(),
 ): Line {
-  // A branch out of the landing order has no place in it: the cell stays empty
-  const rank = branch.rank === null ? '' : String(branch.rank)
+  // A branch out of the landing order has no place in it: a dim dash
+  const rank = branch.rank === null ? '-' : String(branch.rank)
   const segments: Segment[] = [
-    { text: rank.padStart(RANK_CELLS - 1).padEnd(RANK_CELLS), bold: true },
+    { text: rank.padStart(RANK_CELLS - 1).padEnd(RANK_CELLS), bold: branch.rank !== null, dim: branch.rank === null },
     { text: padEnd(truncateMiddle(sanitize(branch.name), table.branch), table.branch) },
     { text: ' '.repeat(GAP_CELLS) },
     { text: padEnd(table.labels[branch.lane], table.lane), color: LANE_COLORS[branch.lane] },
@@ -877,7 +877,7 @@ export function helpLinesOf(base: string, columns: number): Line[] {
         {
           term: { text: '1 2 3', bold: true },
           meaning:
-            'the order to land the ready branches in: stack parents first, then whichever forces the least rebase work on the others, then whichever finished first. A branch without a number cannot land yet: its lane and note say why',
+            'the order to land the ready branches in: stack parents first, then whichever forces the least rebase work on the others, then whichever finished first. A branch with - in place of a number cannot land yet: its lane and note say why',
         },
         { term: { text: '+3' }, meaning: `commits the branch has that ${onto} lacks` },
         { term: { text: '5m' }, meaning: 'since its last commit' },
