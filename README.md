@@ -39,7 +39,7 @@ Answer `y` to add the marketplace, then pick a scope.
 | `/radar` | Opens the radar on the session's repository, or closes it |
 | `/radar <base>` | Opens it with another base branch than the detected one (`origin/HEAD`, else `main`, else `master`) |
 | `/radar help` | Opens it on its help: what each lane and note means |
-| `/radar hold <branch> [reason]` | Parks a branch: it stays out of the READY lane |
+| `/radar hold <branch> [reason]` | Parks a branch, say one that is done but waits on a review: it leaves the landing order (the ready lane and `next`) whatever else it shows. Only the radar records it: the branch and git stay as they are. Every session of the repository on this machine sees the hold until it is let go |
 | `/radar unhold <branch>` | Lets it go again |
 | `/radar off` | Closes the radar |
 

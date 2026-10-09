@@ -88,7 +88,7 @@ export const LANE_MEANINGS: Readonly<Record<Lane, string>> = {
   NEEDS_REBASE: 'conflicts with {base}: it needs a rebase before it can land',
   STACKED: 'holds every commit of another open branch: that one lands first',
   IN_PROGRESS: 'uncommitted changes, a rebase under way, or a busy Claude session in its worktree',
-  HOLD: 'parked with /radar hold, out of the ready lane until it is let go',
+  HOLD: 'parked by you with /radar hold: out of the landing order, whatever else it shows, until you let it go',
   CLEANUP: 'nothing left to land: landed in {base}, or no commits and no session',
 }
 
@@ -666,7 +666,11 @@ export function helpLinesOf(base: string, columns: number): Line[] {
         { term: { text: 'h' }, meaning: 'this help, and back; the band takes keys after ctrl+x tab or a click' },
         { term: { text: 'c' }, meaning: 'folds the radar into one line: what lands next, then the counts' },
         { term: { text: 'x' }, meaning: 'exits the radar, as /radar does' },
-        { term: { text: '/radar hold <branch>' }, meaning: 'parks a branch; /radar unhold <branch> lets it go' },
+        {
+          term: { text: '/radar hold <branch>' },
+          meaning:
+            'parks a branch, with an optional reason: say it is done but waits on a review. It leaves the ready lane and next skips it. Only the radar notes it: the branch and git stay as they are. Every session of this repository on this machine sees the hold until /radar unhold <branch>',
+        },
       ],
     },
   ]
