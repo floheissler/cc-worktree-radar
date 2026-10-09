@@ -333,6 +333,19 @@ describe('/radar', () => {
 
     expect((await bandText($)).some(text => text.endsWith('land next → feat/parent'))).toBe(true)
   })
+
+  test("shows another session's hold at its next poll", async ($, on) => {
+    const { clock, store } = worldOf(on)
+
+    await $.command.run(RADAR)
+    await settled(clock)
+
+    // Another session of the repository holds feat/parent: no ref moves
+    store.set('holds:/work/.git', { ...HOLDS, 'feat/parent': { reason: 'held in another session', at: NOW } })
+    await nextRead(clock)
+
+    expect((await bandText($)).some(text => /^ - feat\/parent\s+on hold\s+\+1 +\d+[smhd]  held in another session/.test(text))).toBe(true)
+  })
 })
 
 describe('the radar tool', () => {

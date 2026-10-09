@@ -114,8 +114,11 @@ the module otherwise:
   reflog), and the reflog's path is tested with runs a test adds.
 - A read runs only once a change has settled (`SETTLE_MS`), one at a time
   (`readNow` queues at most one more), and again every `REFRESH_MS` with no
-  change seen. A poll is cheap: the branch tips, the worktree list and,
-  every `SESSIONS_EVERY` polls, `claude agents --json`.
+  change seen. A poll is cheap: the branch tips, the worktree list, the
+  holds in the store and, every `SESSIONS_EVERY` polls, `claude agents
+  --json`. The holds are in the fingerprint because another session holds a
+  branch without moving a ref: without them its hold showed only at the
+  next `REFRESH_MS` read (63 s in a live run).
 - A worktree's `sessions` holds who works there: the sessions
   `claude agents` lists by folder, and subagents (`kind: 'agent'`). A
   subagent runs inside its parent's process, so the CLI lists no session in

@@ -15,8 +15,8 @@ import { clipChars, sanitize } from './text'
  * The radar at work while it is open: the polls that notice a change, the
  * reads that follow it, and what a read tells the session.
  *
- * A poll is cheap (the branch tips, the worktree list, the sessions); a read
- * runs every simulated merge, so it runs only once a change has settled, one
+ * A poll is cheap (the branch tips, the worktree list, the sessions, the
+ * holds); a read runs every simulated merge, so it runs only once a change has settled, one
  * at a time. The band redraws from the state each read writes.
  */
 
@@ -120,14 +120,16 @@ async function sessionsOf(host: Host): Promise<SessionRow[] | null> {
 }
 
 /**
- * Takes the cheap fingerprint of a repository.
+ * Takes the cheap fingerprint of a repository. The holds are in it: another
+ * session holds a branch without moving a ref.
  *
  * @param host the engine's calls
  * @param git git, bound to the radar's folder
+ * @param holds the repository's holds, as the store has them now
  * @param listed the sessions listed a moment ago, to skip listing them again
  * @returns the fingerprint, or null where git failed
  */
-async function probeOf(host: Host, git: Git, listed?: SessionRow[] | null): Promise<Probe | null> {
+async function probeOf(host: Host, git: Git, holds: Readonly<Record<string, Hold>>, listed?: SessionRow[] | null): Promise<Probe | null> {
   const [heads, trees, sessions] = await Promise.all([
     git(['for-each-ref', `--format=${HEADS_FORMAT}`, 'refs/heads']),
     git(['worktree', 'list', '--porcelain']),
@@ -144,7 +146,11 @@ async function probeOf(host: Host, git: Git, listed?: SessionRow[] | null): Prom
     .map(session => `${session.id}:${session.status}:${folderKeyOf(session.cwd)}`)
     .sort()
 
-  return { fingerprint: [heads.stdout, trees.stdout, sessions === null ? '?' : here.join('\n')].join('\0'), sessions }
+  const held = Object.entries(holds)
+    .map(([branch, hold]) => `${branch}:${hold.at}:${hold.reason}`)
+    .sort()
+
+  return { fingerprint: [heads.stdout, trees.stdout, sessions === null ? '?' : here.join('\n'), held.join('\n')].join('\0'), sessions }
 }
 
 /**
@@ -246,11 +252,11 @@ export function createRadar(): Radar {
     }
 
     const git = gitOf(host.run, radar.root)
-    const probe = await probeOf(host, git)
+    const holds = await holdsFor(host, git, radar.root)
+    const probe = await probeOf(host, git, holds)
 
     lastSessions = probe?.sessions
-    const [holds, comments, dueMarks, now, agents] = await Promise.all([
-      holdsFor(host, git, radar.root),
+    const [comments, dueMarks, now, agents] = await Promise.all([
       host.state.comments.get(),
       host.state.dueMarks.get(),
       host.now(),
@@ -333,7 +339,8 @@ export function createRadar(): Radar {
     // Listing the sessions starts the claude CLI: every other poll is enough
     ticks += 1
 
-    const probe = await probeOf(host, gitOf(host.run, radar.root), ticks % SESSIONS_EVERY === 0 ? undefined : lastSessions)
+    const git = gitOf(host.run, radar.root)
+    const probe = await probeOf(host, git, await holdsFor(host, git, radar.root), ticks % SESSIONS_EVERY === 0 ? undefined : lastSessions)
     const now = await host.now()
 
     lastSessions = probe?.sessions
