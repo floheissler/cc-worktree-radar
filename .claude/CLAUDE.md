@@ -152,10 +152,16 @@ the module otherwise:
 - The radar belongs to its conversation. `$.state` dies with the process
   and `/clear`, `/resume`, `/branch` reset it, so an open radar is also kept
   in `$.store` under `resume:` and the session's id (`saved.ts`), one key per
-  session: saved at open (`openRadar`, so a process that dies still
-  resumes it) and as it stands at `session.end` (the config with the
-  caller's wake list, `compact`, `status`, `comments`, `dueMarks`; not the read,
-  not the help); a close forgets it, a closed radar writes nothing.
+  session: saved at open (`openRadar`), after each change a person or a
+  caller makes (`keepChange`: folding, the status line, a comment), and as
+  it stands at `session.end` (the config with the caller's wake list,
+  `compact`, `status`, `comments`, `dueMarks`; not the read, not the help);
+  a close forgets it, a closed radar writes nothing. So a process that dies
+  still resumes it as it was (found live: saved at open and end alone, a
+  `kill -9` lost the fold). Saves go under `savedAs`, the session it opened
+  or reopened in, not `$.session.id()`, which lags a `/resume` or
+  `/branch` (below); the due marks a read finds ride along, never saved
+  from a read.
   `session.start` in an interactive new process reopens what its
   `$.session.id()` left (`claude --continue`, `--resume`). In the process,
   `classic.SessionStart` reopens: `resume` what `e.session_id` left, or

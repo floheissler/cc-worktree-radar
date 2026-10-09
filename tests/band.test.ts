@@ -510,6 +510,56 @@ describe('across sessions', () => {
     })
   })
 
+  test('saves each change as it is made: a process that dies comes back with it', async ($, on) => {
+    const { clock, store } = worldOf(on)
+    const opened = $.tool.call({ tool: TOOL, action: 'open', wake: ['ready'] } as never)
+
+    await settled(clock)
+    await opened
+
+    const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
+
+    await ui.press({ key: 'compact' })
+    await settled(clock)
+    await ui.unmount()
+
+    const commented = $.tool.call({ tool: TOOL, action: 'comment', branch: 'feat/conflict', text: 'handed back to b-7c' } as never)
+
+    await settled(clock)
+    await commented
+    await $.tool.call({ tool: TOOL, action: 'status', text: 'release v0.4.1 pending' } as never)
+    await settled(clock)
+
+    // No session.end: the process could die here
+    expect(store.get('resume:session-a')).toMatchObject({
+      radar: { root: '/work', base: null, wake: ['ready'] },
+      compact: true,
+      status: 'release v0.4.1 pending',
+      comments: { 'feat/conflict': { sha: tipOf('feat/conflict'), text: 'handed back to b-7c' } },
+    })
+  })
+
+  test('a change just after /resume is saved for the resumed session', async ($, on) => {
+    const { clock, store } = worldOf(on, undefined, { 'resume:session-b': leftOpen() })
+
+    await $.session.start(START)
+    await $.command.run(RADAR)
+    await settled(clock)
+    await $.session.end(endOf('resume'))
+    // $.session.id() answers session-a still, as it does until the next command
+    await $.classic.SessionStart({ source: 'resume', session_id: 'session-b' })
+    await settled(clock)
+
+    const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
+
+    await ui.press({ key: 'compact' })
+    await settled(clock)
+    await ui.unmount()
+
+    expect(store.get('resume:session-b')).toMatchObject({ compact: false, status: 'release v0.4.1 pending' })
+    expect(store.get('resume:session-a')).toMatchObject({ compact: false, status: null })
+  })
+
   test('a resumed session, in a new process, opens the radar as it was left', async ($, on) => {
     const { clock, store } = worldOf(on, undefined, { 'resume:session-a': leftOpen() })
 

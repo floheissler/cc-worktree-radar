@@ -88,7 +88,7 @@ The radar belongs to the conversation it was opened in:
 
 | You | The radar |
 |---|---|
-| resume a session: `claude --continue`, `claude --resume`, `/resume` | comes back as that session left it: open or closed, folded or not, with a skill's wake list, status line and comments |
+| resume a session: `claude --continue`, `claude --resume`, `/resume` | comes back as that session left it, even if its process died: open or closed, folded or not, with a skill's wake list, status line and comments |
 | start a new session | stays closed |
 | `/clear` | stays as it was, but wakes nothing until a skill opens it again: the wakes were asked for by the conversation you cleared |
 | `/branch` | stays as it was in the branch, wake list and all |

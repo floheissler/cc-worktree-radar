@@ -136,10 +136,36 @@ function hostOf($: EngineInterface, options: RadarOptions): Host {
 }
 
 /**
+ * The session the open radar is saved under: the one it opened or reopened
+ * in. `$.session.id()` lags a `/resume` or `/branch`, answering the session
+ * left until the next command, so a save in between must not ask it. Null
+ * while closed, and after a reload of the module, when it has caught up.
+ */
+let savedAs: string | null = null
+
+/**
+ * Saves the open radar as it stands, after a change a person or a caller
+ * made (folding, the status line, a comment), so a process that dies
+ * before `session.end` still comes back with it. The due marks a read finds
+ * ride along with these saves and the one at `session.end`, not on their
+ * own: a read can land in the lag `savedAs` covers, and only refines the
+ * rebase order.
+ *
+ * @param host the engine's calls
+ */
+async function keepChange(host: Host): Promise<void> {
+  try {
+    await keepRadar(host, savedAs ?? (await host.sessionId()))
+  } catch {
+    // It comes back as it was at its last save, or at session.end
+  }
+}
+
+/**
  * Opens the radar on a folder, replacing one open before, and starts its
  * polls; the first read follows at once. It is saved for the session's
- * resume as it opens: a process that dies without ending the session still
- * comes back with it.
+ * resume as it opens, and again on each change (`keepChange`): a process
+ * that dies without ending the session still comes back with it.
  *
  * @param host the engine's calls
  * @param radar the radar's polls and reads
@@ -155,6 +181,7 @@ async function openRadar(host: Host, radar: Radar, config: RadarConfig): Promise
   try {
     const sessionId = await host.sessionId()
 
+    savedAs = sessionId
     await keepRadar(host, sessionId)
     void pruneSaved(host, sessionId).catch(() => undefined)
   } catch {
@@ -169,6 +196,7 @@ async function openRadar(host: Host, radar: Radar, config: RadarConfig): Promise
  */
 async function clearRadar(host: Host, radar: Radar): Promise<void> {
   radar.stop()
+  savedAs = null
   await host.state.radar.set(() => null)
   await host.state.snapshot.set(() => null)
   await host.state.problem.set(() => null)
@@ -221,6 +249,7 @@ async function reopenRadar(host: Host, radar: Radar, saved: SavedRadar | null, s
   await host.state.problem.set(() => null)
   // Last, so the band's first drawing has the rest
   await host.state.radar.set(() => saved.radar)
+  savedAs = sessionId
   await saveRadar(host, sessionId, { ...saved, savedAt: await host.now() }).catch(() => undefined)
   void radar.start(host).catch(() => undefined)
 }
@@ -457,6 +486,7 @@ export const register: Register = (on, pluginOptions) => {
           return { result: `Comment set on ${request.branch}.` }
         }
 
+        await keepChange(host)
         await radar.readNow(host)
 
         return answerOf(host)
@@ -465,6 +495,7 @@ export const register: Register = (on, pluginOptions) => {
         const text = request.text.trim()
 
         await host.state.status.set(() => (text === '' ? null : clipChars(text, Limits.COMMENT_CHARS)))
+        await keepChange(host)
 
         return { result: text === '' ? 'Status line cleared.' : 'Status line set.' }
       }
@@ -508,7 +539,12 @@ export const register: Register = (on, pluginOptions) => {
         void hostOf($, options).state.helpShown.set(shown => !shown)
       },
       compact: () => {
-        void hostOf($, options).state.compact.set(compact => !compact)
+        const host = hostOf($, options)
+
+        void host.state.compact
+          .set(compact => !compact)
+          .then(() => keepChange(host))
+          .catch(() => undefined)
       },
       exit: () => {
         void closeRadar(hostOf($, options), radar)
