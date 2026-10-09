@@ -165,6 +165,9 @@ export function createRadar(): Radar {
   let queued: Promise<void> | null = null
   const commonDirs = new Map<string, string>()
   const reported = new Set<string>()
+  // The wake the session has not taken yet, and the events found since
+  let pendingWake: Promise<void> | null = null
+  let outbox: RadarEvent[] = []
 
   const schedule = (host: Host, at: number, ms: number): void => {
     timer?.cancel()
@@ -189,6 +192,32 @@ export function createRadar(): Radar {
     return holdsIn(await host.store.get(holdsKeyOf(commonDir)).catch(() => undefined))
   }
 
+  /**
+   * Sends what the outbox holds as one wake, unless the session has not
+   * taken the last one yet: a submitted prompt settles only once its turn
+   * starts, after whatever turn the session is in. The events found
+   * meanwhile go out together once it has, so a long turn ends in one wake,
+   * not one per read. Nothing waits on it: a read that waited stalled the
+   * polls for the whole turn, and a read the session's own tool call ran
+   * waited on a wake that could start only after that call.
+   */
+  const sendWakes = (host: Host): void => {
+    if (pendingWake !== null || outbox.length === 0) {
+      return
+    }
+
+    const text = wakeTextOf(outbox)
+
+    outbox = []
+    pendingWake = host
+      .submit(text)
+      .catch(() => undefined)
+      .finally(() => {
+        pendingWake = null
+        sendWakes(host)
+      })
+  }
+
   const announce = async (host: Host, radar: RadarConfig, events: readonly RadarEvent[]): Promise<void> => {
     const fresh = events.filter(event => !reported.has(event.key))
 
@@ -196,11 +225,8 @@ export function createRadar(): Radar {
       reported.add(event.key)
     }
 
-    const wake = fresh.filter(event => radar.wake.includes(event.kind))
-
-    if (wake.length > 0) {
-      await host.submit(wakeTextOf(wake)).catch(() => undefined)
-    }
+    outbox.push(...fresh.filter(event => radar.wake.includes(event.kind)))
+    sendWakes(host)
 
     const ready = fresh.filter(event => event.kind === 'ready')
 
@@ -358,6 +384,8 @@ export function createRadar(): Radar {
       timer = null
       shownFingerprint = null
       pendingFingerprint = null
+      // A closed radar wakes no one; a wake already submitted is the engine's
+      outbox = []
     },
     readNow,
     setHold: async (host, root, branch, reason) => {

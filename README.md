@@ -129,7 +129,9 @@ your own can open the radar and act on what it sees. Allow it in the skill's
 `wake` lists the events that wake the session with a one-line prompt:
 `ready`, `conflict`, `rebase-due`, `stacked`, `cleanup`, `base-moved`,
 `session-idle` (a session going idle, or a subagent finishing). Each event
-wakes once per branch tip. `/radar` itself wakes nothing. The prompt is a
+wakes once per branch tip. While the session is at work, a wake waits for
+its turn to end, and what the radar finds meanwhile comes in one more wake
+after it. `/radar` itself wakes nothing. The prompt is a
 report and says so:
 
 ```

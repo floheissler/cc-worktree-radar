@@ -45,15 +45,36 @@ const START = { cwd: '/work', surface: 'terminal', isInteractive: true } as cons
 /**
  * A session in the fixture's repository: git answers from the recording,
  * what the radar raises (prompts, notifications) is recorded, and the store
- * is a map the test reads.
+ * is a map the test reads. A prompt the radar submits counts once the
+ * session takes it: at once, or, while the test keeps the session at work
+ * (`turn.start`), once that turn ends (`turn.end`).
  *
  * @param on the test's `on`
- * @param runs the recording git answers from
+ * @param runs the recording git answers from, and what `claude agents` lists
  * @param stored what the store holds besides the fixture's hold
  */
-function worldOf(on: On, runs: { current: Recorded } = { current: RUNS }, stored: Readonly<Record<string, unknown>> = {}) {
+function worldOf(
+  on: On,
+  runs: { current: Recorded; sessions?: string } = { current: RUNS },
+  stored: Readonly<Record<string, unknown>> = {},
+) {
   const clock = mock.clock(on, { now: NOW })
   const prompts: string[] = []
+  let working: { readonly ended: Promise<void>; readonly end: () => void } | null = null
+  const turn = {
+    start: () => {
+      let end = (): void => undefined
+      const ended = new Promise<void>(resolve => {
+        end = resolve
+      })
+
+      working = { ended, end }
+    },
+    end: () => {
+      working?.end()
+      working = null
+    },
+  }
   const notices: string[] = []
   const toasts: string[] = []
   // The fixture's hold, where the radar keeps holds: by the repository's
@@ -93,7 +114,8 @@ function worldOf(on: On, runs: { current: Recorded } = { current: RUNS }, stored
     return Box({})
   })
   on('process.run', ($, e) => replay(e.argv, e.init))
-  on('prompt.submit', ($, e) => {
+  on('prompt.submit', async ($, e) => {
+    await working?.ended
     prompts.push(e.text)
 
     return { text: e.text }
@@ -105,10 +127,10 @@ function worldOf(on: On, runs: { current: Recorded } = { current: RUNS }, stored
   })
 
   async function replay(argv: readonly string[], init: unknown) {
-    return { value: await replayOf(runs.current).run(argv, (init ?? {}) as never) }
+    return { value: await replayOf(runs.current, runs.sessions).run(argv, (init ?? {}) as never) }
   }
 
-  return { clock, prompts, notices, toasts, store }
+  return { clock, prompts, notices, toasts, store, turn }
 }
 
 async function settled(clock: MockClock): Promise<void> {
@@ -395,6 +417,52 @@ describe('wake-ups and notifications', () => {
 
     expect(prompts).toHaveLength(1)
   })
+
+  test('a wake the session has not taken yet holds up neither the radar nor its own tool', async ($, on) => {
+    const runs = { current: blockReady(RUNS), sessions: sessionsOf(['landed-worker', 'landed', 'busy']) }
+    const { clock, prompts, turn } = worldOf(on, runs)
+    const opened = $.tool.call({ tool: TOOL, action: 'open', wake: ['ready', 'session-idle'] } as never)
+
+    await settled(clock)
+    await opened
+    // The session is at work: what the radar submits waits for the turn
+    turn.start()
+
+    runs.current = RUNS
+    await nextRead(clock)
+
+    expect(prompts).toEqual([])
+
+    // The radar reads on meanwhile: feat/ready-a is held back again, and a
+    // session goes idle
+    runs.current = blockReady(RUNS)
+    runs.sessions = sessionsOf(['landed-worker', 'landed', 'idle'], ['wip-worker', 'wip', 'busy'])
+    await nextRead(clock)
+
+    expect((await bandText($)).some(text => /feat\/ready-a\s+in progress/.test(text))).toBe(true)
+
+    // The session's own tool reads, and answers, though the read finds an
+    // event to wake it for
+    runs.sessions = sessionsOf(['landed-worker', 'landed', 'idle'], ['wip-worker', 'wip', 'idle'])
+
+    const snapshot = $.tool.call({ tool: TOOL, action: 'snapshot' } as never)
+
+    await settled(clock)
+
+    expect(JSON.parse(String((await snapshot).result)).schema).toBe(1)
+    expect(prompts).toEqual([])
+
+    // The turn ends: the first wake, then what came since in one (feat/wip,
+    // its worktree given to feat/ready-a, has none left to keep it busy)
+    turn.end()
+    await settled(clock)
+
+    expect(prompts).toEqual([
+      `worktree-radar: feat/ready-a is ready to land (#2). ${WAKE_NOTE}`,
+      'worktree-radar: feat/wip is ready to land (#2) · session landed-worker on feat/landed went idle · ' +
+        `session wip-worker on feat/ready-a went idle. ${WAKE_NOTE}`,
+    ])
+  })
 })
 
 describe('across sessions', () => {
@@ -597,6 +665,35 @@ function leftOpen(savedAt = NOW) {
     dueMarks: {},
     savedAt,
   }
+}
+
+/**
+ * Polls until a change is read: a listing of the sessions, the settle, the
+ * read.
+ */
+async function nextRead(clock: MockClock): Promise<void> {
+  for (const ms of [4_000, 4_000, 2_000]) {
+    await clock.advance(ms)
+    await settled(clock)
+  }
+}
+
+/**
+ * What `claude agents --json` lists: sessions in the fixture's worktrees.
+ *
+ * @param rows each session's name, the worktree it works in, its status
+ */
+function sessionsOf(...rows: readonly (readonly [name: string, worktree: string, status: string])[]): string {
+  return JSON.stringify(
+    rows.map(([name, worktree, status], at) => ({
+      pid: 4_200 + at,
+      sessionId: `session-${name}`,
+      name,
+      cwd: `/work/.claude/worktrees/${worktree}`,
+      kind: 'interactive',
+      status,
+    })),
+  )
 }
 
 /**

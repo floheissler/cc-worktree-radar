@@ -131,7 +131,14 @@ the module otherwise:
   progress since. `pipeline.py` used its private hand-back records here.
 - Events wake the session only for the kinds the caller listed at `open`,
   once per branch tip (`reported`, the module's), never on the first read.
-  `/radar` lists none. The wake line (`wakeTextOf`) is the events, then
+  `/radar` lists none. A wake goes out through an outbox (`sendWakes`) that
+  nothing waits on: `$.prompt.submit` settles only once its turn starts,
+  after the turn the session is in. A read that awaited it stalled the
+  polls for that whole turn (found live: an event 23 s late), and a
+  `snapshot` the session's own tool ran waited on a wake that could start
+  only after it. The events found while a wake waits go out together, in
+  one wake, once the session takes it; closing the radar empties the
+  outbox. The wake line (`wakeTextOf`) is the events, then
   `WAKE_NOTE`: a report from a read-only view, not a request, to act on only
   as the user or the session's instructions say. Without it a woken model
   took "is ready to land" as its user's request and merged (below).
