@@ -19,5 +19,19 @@
     "sessions",
     "mod"
   ],
+  "userConfig": {
+    "notifyReady": {
+      "type": "boolean",
+      "title": "Notify when a branch is ready",
+      "description": "Raise a desktop notification when a branch becomes ready to land.",
+      "default": true
+    },
+    "pollSeconds": {
+      "type": "number",
+      "title": "Seconds between checks",
+      "description": "How often the open radar checks the repository for a change (1 to 60).",
+      "default": 4
+    }
+  },
   "types": "./types/index.d.ts"
 }

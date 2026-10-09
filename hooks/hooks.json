@@ -1,4 +1,4 @@
 {
-  "description": "The radar: /radar and its band above the prompt",
+  "description": "The radar: /radar and its band above the prompt, the radar tool the model calls, and the polls that keep the band live while it is open",
   "modules": ["./register.tsx"]
 }

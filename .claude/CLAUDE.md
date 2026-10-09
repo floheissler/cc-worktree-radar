@@ -34,7 +34,36 @@ work on the next item.
 - `.github/workflows/ci.yml`: validate and the tests on Ubuntu, Windows and
   macOS. Anthropic's directory scans it: install Claude Code there with
   npm, never a download piped into a shell.
-- The code's layout is written with ROADMAP item A1; keep this list current.
+- `types/index.d.ts`: the snapshot's types (the tool's JSON contract) and
+  the `$.state` contract (`PluginState['worktree-radar']`).
+- `hooks/register.tsx`: the hooks and the only file that touches `$`:
+  `/radar`, the `radar` tool, the `AbovePrompt` band, `session.start`.
+- `hooks/host.ts`: the `Host` record the rest of the code takes instead of
+  `$`, and the person's settings (`RadarOptions`).
+- `hooks/radar.ts`: the radar at work while open: polls, reads, holds and
+  notes, and what a read tells the session (wake prompts, notifications).
+- `hooks/analysis.ts`: the read itself, ported from the owner's private
+  `merge-pipeline` script (`pipeline.py snapshot`): lanes, simulated merges,
+  stacking, knock-on conflicts, READY's ranking, the rebase order, and each
+  branch's one-line `summary`.
+- `hooks/repo.ts`: git's branches and worktrees, read and parsed; the base.
+- `hooks/sessions.ts`: `claude agents --json`, and which worktree each
+  session works in.
+- `hooks/git.ts`: every git run, through one `Git` (`GIT_ENV`, the
+  timeout, null for any failure); `mapLimit` for parallel runs.
+- `hooks/changes.ts`: the events between two reads, the wake line, the
+  marks of branches found due a rebase.
+- `hooks/rows.ts`: the band's lines laid out in cells (pure);
+  `hooks/view.tsx` draws them.
+- `hooks/tool.ts`, `hooks/command.ts`: the tool's description, schema,
+  input and JSON answer; `/radar`'s arguments.
+- `hooks/text.ts`, `hooks/cell-widths.ts`, `scripts/cell-widths.mjs`: cell
+  widths and `sanitize`, carried over from cc-file-explorer unchanged.
+- `tests/`: `claude plugin test` suites. `fixtures/repo.ts` is a recording
+  of every git run of one read of a real test repository (paths rewritten to
+  `/work`), checked against `pipeline.py`'s own answers; `replay.ts` answers
+  git from it. `band.test.ts` mounts the band and drives `/radar` and the
+  tool through the engine.
 
 ## Rules the engine's static scan enforces
 
@@ -50,6 +79,34 @@ the module otherwise:
 - Write hook matchers as literals (`{ command: 'radar' }`), so validation and
   an administrator's review read exactly what each hook matches.
 - A `ui.render` hook never writes state; write from a handler or another hook.
+
+## Conventions
+
+- The analysis stays behavior-compatible with `pipeline.py snapshot` for
+  every fact the script computes, minus releases and hand-backs. To check a
+  change against real git, run `hooks/analysis.ts` under Node (type
+  stripping, with a resolve hook that adds `.ts`) on a throwaway repository
+  and compare with `pipeline.py -C <repo> snapshot --json`. Re-record
+  `tests/fixtures/repo.ts` the same way when the git runs change.
+- A read runs only once a change has settled (`SETTLE_MS`), one at a time
+  (`readNow` queues at most one more), and again every `REFRESH_MS` with no
+  change seen. A poll is cheap: the branch tips, the worktree list and,
+  every `SESSIONS_EVERY` polls, `claude agents --json`.
+- The rebase order counts a branch as being rebased when its worktree is
+  mid-rebase, or when it was found due a rebase (`dueMarks`) and is in
+  progress since. `pipeline.py` used its private hand-back records here.
+- Events wake the session only for the kinds the caller listed at `open`,
+  once per branch tip (`reported`, the module's), never on the first read.
+  `/radar` lists none.
+- Holds live in `$.store` under `holds:` and the repository's shared `.git`
+  folder (`folderKeyOf`), one key per repository, so every worktree and
+  session of it sees the same holds. What the store holds is checked
+  (`holdsIn`).
+- The tool hook matches its tool by a pattern (`/^mcp__worktree-radar__radar$/`):
+  the laid MCP types do not list a plugin's own tool, so a literal fails
+  `tsc`.
+- Lanes are colored with theme keys (`LANE_COLORS`), and every line is
+  fitted to `bodyColumns` in cells; `rows.test.ts` sweeps 1–160 columns.
 
 ## Carried over from cc-file-explorer
 
