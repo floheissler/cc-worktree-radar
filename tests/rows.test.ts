@@ -68,7 +68,7 @@ describe('the band laid out', () => {
       'row:chore/merged',
       'foot',
     ])
-    expect(textOf(lines[1])).toMatch(/^ 1 feat\/parent\s+ready\s+\+1 +\d+[smhd]  feat\/child stacked on it · merges cleanly$/)
+    expect(textOf(lines[1])).toMatch(/^ 1 feat\/parent\s+ready\s+\+1 +\d+[smhd]  feat\/child stacked on it$/)
     expect(textOf(lines[5])).toMatch(/^ - feat\/conflict2\s+needs rebase\s+\+1 +\d+[smhd]  conflicts: a\.txt · rebase after feat\/ready-a/)
     expect(textOf(lines.find(line => line.key === 'row:chore/merged'))).toMatch(/^ - chore\/merged\s+cleanup +nothing beyond main$/)
     expect(textOf(lines.at(-1))).toMatch(
@@ -77,25 +77,32 @@ describe('the band laid out', () => {
     expect(lineWidthOf(lines.at(-1) as Line)).toBe(140)
   })
 
-  test('columns start on the same cell in every row, whatever the branch names', async () => {
+  test('every row lines up under the column names; the branch column fits the longest name', async () => {
     const snapshot = await fixtureSnapshot()
     const long = {
       ...snapshot,
       branches: snapshot.branches.map(branch =>
-        branch.name === 'feat/big' ? { ...branch, name: 'feat/a-very-long-branch-name-that-goes-on-and-on' } : branch,
+        branch.name === 'feat/big' ? { ...branch, name: 'feat/a-much-longer-branch-name' } : branch,
       ),
     }
+    // Where a row's lane cell starts: after the rank, the branch and the gap
+    const laneAt = (line: Line) => lineWidthOf({ key: '', segments: line.segments.slice(0, 3) })
 
     for (const columns of [50, 80, 140]) {
-      const short = bandLinesOf(modelOf(snapshot, { columns }))
-      const wide = bandLinesOf(modelOf(long, { columns }))
-      const laneAt = (line: Line | undefined) => textOf(line).search(/ready|rebase|needs rebase/)
+      for (const shown of [snapshot, long]) {
+        const lines = bandLinesOf(modelOf(shown, { columns }))
+        const header = textOf(lines[0]).indexOf('LANE')
 
-      // The lane column starts where its name does, in both repositories
-      expect(laneAt(short[1]), `${columns}`).toBe(textOf(short[0]).indexOf('LANE'))
-      expect(laneAt(wide[1]), `${columns}`).toBe(laneAt(short[1]))
-      expect(textOf(wide[0])).toBe(textOf(short[0]))
+        for (const row of lines.filter(line => line.key.startsWith('row:'))) {
+          expect(laneAt(row), `${row.key} at ${columns}`).toBe(header)
+        }
+      }
     }
+
+    // Wide, the branch column is as wide as the longest name, then a gap
+    const lines = bandLinesOf(modelOf(snapshot, { columns: 140 }))
+
+    expect(textOf(lines[0]).indexOf('LANE')).toBe(3 + 'feat/conflict2'.length + 2)
   })
 
   test('colors each lane with a theme key', async () => {

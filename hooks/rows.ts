@@ -129,16 +129,17 @@ const AHEAD_CELLS = 5
 const AGE_CELLS = 5
 
 /**
- * The branch column's share of what the fixed columns leave, and its
- * bounds, per width: wide, then medium.
+ * The most of what the fixed columns leave that the branch column may
+ * take, per width: wide, then medium; and the least it takes, so its name
+ * (`BRANCH`) fits.
  */
 const BRANCH_SHARE = { wide: 0.45, medium: 0.5 } as const
-const BRANCH_CELLS = { wide: [14, 32], medium: [10, 24] } as const
+const BRANCH_MIN_CELLS = 6
 
 /**
  * The queue's columns at one width: each one's cells, 0 for a column the
- * width leaves out. They follow the band's width alone, never the branch
- * names, so a column starts on the same cell at every redraw.
+ * width leaves out. The branch column is as wide as the longest name, up
+ * to its share; the others are fixed, so every row of a drawing lines up.
  */
 export type TableColumns = {
   readonly branch: number
@@ -150,21 +151,23 @@ export type TableColumns = {
 }
 
 /**
- * Sizes the queue's columns to the band.
+ * Sizes the queue's columns to the band and the branches it shows.
  *
  * @param columns the cells a row may take
+ * @param names the branches' names, sanitized
  * @returns the columns
  */
-export function tableColumnsOf(columns: number): TableColumns {
+export function tableColumnsOf(columns: number, names: readonly string[]): TableColumns {
   const shortLabel = Math.max(...Object.values(SHORT_LANE_LABELS).map(label => label.length))
+  const longest = Math.max(BRANCH_MIN_CELLS, ...names.map(cellWidth))
+  const fit = (left: number, share: number): number => Math.max(Math.min(longest, Math.floor(left * share)), 1)
 
   if (columns >= WIDE_COLUMNS) {
     const lane = Math.max(...Object.values(LANE_LABELS).map(label => label.length))
     const left = columns - RANK_CELLS - GAP_CELLS - lane - AHEAD_CELLS - AGE_CELLS - GAP_CELLS
-    const [low, high] = BRANCH_CELLS.wide
 
     return {
-      branch: Math.min(Math.max(Math.floor(left * BRANCH_SHARE.wide), low), high),
+      branch: fit(left, BRANCH_SHARE.wide),
       lane,
       labels: LANE_LABELS,
       ahead: AHEAD_CELLS,
@@ -175,10 +178,9 @@ export function tableColumnsOf(columns: number): TableColumns {
 
   if (columns >= MEDIUM_COLUMNS) {
     const left = columns - RANK_CELLS - GAP_CELLS - shortLabel - AGE_CELLS - GAP_CELLS
-    const [low, high] = BRANCH_CELLS.medium
 
     return {
-      branch: Math.min(Math.max(Math.floor(left * BRANCH_SHARE.medium), low), high),
+      branch: fit(left, BRANCH_SHARE.medium),
       lane: shortLabel,
       labels: SHORT_LANE_LABELS,
       ahead: 0,
@@ -188,7 +190,7 @@ export function tableColumnsOf(columns: number): TableColumns {
   }
 
   return {
-    branch: Math.max(columns - RANK_CELLS - GAP_CELLS - shortLabel, 1),
+    branch: Math.max(Math.min(longest, columns - RANK_CELLS - GAP_CELLS - shortLabel), 1),
     lane: shortLabel,
     labels: SHORT_LANE_LABELS,
     ahead: 0,
@@ -402,13 +404,11 @@ export function noteOf(branch: BranchInfo, base: string): Segment[] {
         parts.push({ text: `${name(shortList(branch.dependents, 1))} stacked on it`, dim: true })
       }
 
-      parts.push({
-        text:
-          branch.breaks.length > 0
-            ? `forces a rebase of ${name(shortList(branch.breaks.map(broken => broken.branch), 1))}`
-            : `merges cleanly`,
-        dim: true,
-      })
+      // Ready already says it merges cleanly: the note only adds what else
+      if (branch.breaks.length > 0) {
+        parts.push({ text: `forces a rebase of ${name(shortList(branch.breaks.map(broken => broken.branch), 1))}`, dim: true })
+      }
+
       break
     case 'NEEDS_REBASE':
       parts.push({ text: `conflicts: ${name(shortList(branch.conflicts ?? [], 1))}`, dim: true })
@@ -763,7 +763,10 @@ export function bandLinesOf(model: BandModel): Line[] {
     }
   }
 
-  const table = tableColumnsOf(columns)
+  const table = tableColumnsOf(
+    columns,
+    snapshot.branches.filter(branch => !folded.has(branch.lane)).map(branch => sanitize(branch.name)),
+  )
   const lines: Line[] = [columnHeaderOf(table, headerRoomOf(model, columns))]
 
   for (const lane of Object.keys(LANE_LABELS) as Lane[]) {

@@ -114,11 +114,14 @@ the module otherwise:
 - Lanes are colored with theme keys (`LANE_COLORS`), and every line is
   fitted to `bodyColumns` in cells; `rows.test.ts` sweeps 1–160 columns,
   the queue and the help alike.
-- The queue is a table whose columns (`tableColumnsOf`) follow the band's
-  width alone, never the branch names, so a column starts on the same cell
-  at every redraw: wide (from `WIDE_COLUMNS`) `#`, branch, lane, ahead, age,
-  note; medium drops ahead and shortens the lane labels; narrow keeps `#`,
-  branch and lane. Its first row names the columns (`columnHeaderOf`), the
+- The queue is a table (`tableColumnsOf`): the branch column as wide as the
+  longest name shown, up to a share of the row; the other columns fixed, so
+  every row of a drawing lines up under the column names. Fixed widths for
+  the branch column too were tried and dropped: short names left a wide
+  gap. Wide (from `WIDE_COLUMNS`) `#`, branch, lane, ahead, age, note; medium
+  drops ahead and shortens the lane labels; narrow keeps `#`, branch and
+  lane. A ready row's note says only what else there is (a stack on it, a
+  rebase it forces): "merges cleanly" is what ready means. Its first row names the columns (`columnHeaderOf`), the
   controls at its end; the foot has `next →` and what to know on the left,
   the summary (title, repository and base, counts) right-aligned, dropping
   the title, then the repository, then counts that do not fit whole.
