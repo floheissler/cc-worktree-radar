@@ -101,9 +101,9 @@ describe('/radar', () => {
     for (const surface of ['terminal', 'desktop'] as const) {
       const texts = await bandText($, surface)
 
-      expect(texts.some(text => text.startsWith('Worktree Radar · work → main · 4 ready'))).toBe(true)
+      expect(texts.some(text => /^ # BRANCH +LANE/.test(text))).toBe(true)
       expect(texts.some(text => /^ 1 feat\/parent\s+ready/.test(text))).toBe(true)
-      expect(texts.some(text => text === 'next → feat/parent')).toBe(true)
+      expect(texts.some(text => /^next → feat\/parent +Worktree Radar · work → main · 4 ready/.test(text))).toBe(true)
     }
 
     await $.command.run(RADAR)
@@ -131,8 +131,7 @@ describe('/radar', () => {
       const drawn = await narrow.drawn()
 
       expect((drawn as { props: Record<string, unknown> }).props.borderStyle).toBeUndefined()
-      // Three controls leave a 20-column band a few cells of title
-      expect(await narrow.find({ type: 'Text', text: /^Wor/ })).toBeDefined()
+      expect(await narrow.find({ type: 'Text', text: /^next → / })).toBeDefined()
       await narrow.unmount()
     }
   })
@@ -254,13 +253,13 @@ describe('/radar', () => {
     const texts = await bandText($)
 
     expect(texts.some(text => /^ - feat\/parent\s+on hold\s+\+1 +\d+[smhd]  needs a review/.test(text))).toBe(true)
-    expect(texts).toContain('next → feat/ready-a')
+    expect(texts.some(text => text.startsWith('next → feat/ready-a'))).toBe(true)
     expect(toasts).toEqual(['Holding feat/parent'])
 
     await $.command.run({ ...RADAR, args: 'unhold feat/parent' })
     await settled(clock)
 
-    expect(await bandText($)).toContain('next → feat/parent')
+    expect((await bandText($)).some(text => text.startsWith('next → feat/parent'))).toBe(true)
   })
 })
 
@@ -301,7 +300,7 @@ describe('the radar tool', () => {
     const texts = await bandText($)
 
     expect(texts.some(text => /feat\/conflict\s+needs rebase.*handed back to b-7c/.test(text))).toBe(true)
-    expect(texts).toContain('next → feat/parent · release v0.4.1 pending')
+    expect(texts.some(text => text.startsWith('next → feat/parent · release v0.4.1 pending'))).toBe(true)
   })
 
   test('refuses what it cannot do', async ($, on) => {

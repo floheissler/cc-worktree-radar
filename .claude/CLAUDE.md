@@ -114,6 +114,15 @@ the module otherwise:
 - Lanes are colored with theme keys (`LANE_COLORS`), and every line is
   fitted to `bodyColumns` in cells; `rows.test.ts` sweeps 1–160 columns,
   the queue and the help alike.
+- The queue is a table whose columns (`tableColumnsOf`) follow the band's
+  width alone, never the branch names, so a column starts on the same cell
+  at every redraw: wide (from `WIDE_COLUMNS`) `#`, branch, lane, ahead, age,
+  note; medium drops ahead and shortens the lane labels; narrow keeps `#`,
+  branch and lane. Its first row names the columns (`columnHeaderOf`), the
+  controls at its end; the foot has `next →` and what to know on the left,
+  the summary (title, repository and base, counts) right-aligned, dropping
+  the title, then the repository, then counts that do not fit whole.
+  `fitWhole` keeps whole pieces where a cut one would read wrong.
 - The band is framed (`frameOf`: a rounded border in `promptBorder` and a
   cell of padding, 4 cells and 2 rows) from `FRAME_MIN_COLUMNS` on; the
   lines are laid out for the room inside it. The `[-]` beside the band is

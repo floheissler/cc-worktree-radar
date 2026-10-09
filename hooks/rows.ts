@@ -112,17 +112,121 @@ const FOLD_ORDER: readonly Lane[] = ['CLEANUP', 'IN_PROGRESS', 'HOLD', 'STACKED'
 
 /**
  * From this width on a row shows every column; below it the commits ahead
- * go and the lane labels shorten; below the next, the notes go too.
+ * go and the lane labels shorten; below the next, the age and the notes go
+ * too.
  */
 export const WIDE_COLUMNS = 64
 export const MEDIUM_COLUMNS = 40
 
 /**
- * The columns after the lane: commits ahead (`  +3`) and the age of the last
- * commit (`  25m`), each right-aligned.
+ * The fixed columns: the rank (` 1 `), the gap after the branch, commits
+ * ahead (`   +3`) and the age of the last commit (`  25m`), the numbers
+ * right-aligned, and the gap before the note.
  */
-const AHEAD_CELLS = 4
+const RANK_CELLS = 3
+const GAP_CELLS = 2
+const AHEAD_CELLS = 5
 const AGE_CELLS = 5
+
+/**
+ * The branch column's share of what the fixed columns leave, and its
+ * bounds, per width: wide, then medium.
+ */
+const BRANCH_SHARE = { wide: 0.45, medium: 0.5 } as const
+const BRANCH_CELLS = { wide: [14, 32], medium: [10, 24] } as const
+
+/**
+ * The queue's columns at one width: each one's cells, 0 for a column the
+ * width leaves out. They follow the band's width alone, never the branch
+ * names, so a column starts on the same cell at every redraw.
+ */
+export type TableColumns = {
+  readonly branch: number
+  readonly lane: number
+  readonly labels: Readonly<Record<Lane, string>>
+  readonly ahead: number
+  readonly age: number
+  readonly hasNote: boolean
+}
+
+/**
+ * Sizes the queue's columns to the band.
+ *
+ * @param columns the cells a row may take
+ * @returns the columns
+ */
+export function tableColumnsOf(columns: number): TableColumns {
+  const shortLabel = Math.max(...Object.values(SHORT_LANE_LABELS).map(label => label.length))
+
+  if (columns >= WIDE_COLUMNS) {
+    const lane = Math.max(...Object.values(LANE_LABELS).map(label => label.length))
+    const left = columns - RANK_CELLS - GAP_CELLS - lane - AHEAD_CELLS - AGE_CELLS - GAP_CELLS
+    const [low, high] = BRANCH_CELLS.wide
+
+    return {
+      branch: Math.min(Math.max(Math.floor(left * BRANCH_SHARE.wide), low), high),
+      lane,
+      labels: LANE_LABELS,
+      ahead: AHEAD_CELLS,
+      age: AGE_CELLS,
+      hasNote: true,
+    }
+  }
+
+  if (columns >= MEDIUM_COLUMNS) {
+    const left = columns - RANK_CELLS - GAP_CELLS - shortLabel - AGE_CELLS - GAP_CELLS
+    const [low, high] = BRANCH_CELLS.medium
+
+    return {
+      branch: Math.min(Math.max(Math.floor(left * BRANCH_SHARE.medium), low), high),
+      lane: shortLabel,
+      labels: SHORT_LANE_LABELS,
+      ahead: 0,
+      age: AGE_CELLS,
+      hasNote: true,
+    }
+  }
+
+  return {
+    branch: Math.max(columns - RANK_CELLS - GAP_CELLS - shortLabel, 1),
+    lane: shortLabel,
+    labels: SHORT_LANE_LABELS,
+    ahead: 0,
+    age: 0,
+    hasNote: false,
+  }
+}
+
+/**
+ * The row naming the queue's columns, aligned with them.
+ *
+ * @param table the columns
+ * @param columns the cells the row may take
+ * @returns the row
+ */
+export function columnHeaderOf(table: TableColumns, columns: number): Line {
+  const name = (text: string): Segment => ({ text, dim: true })
+  const groups: Segment[][] = [
+    [name('#'.padStart(RANK_CELLS - 1).padEnd(RANK_CELLS))],
+    [name(padEnd(truncateEnd('BRANCH', table.branch), table.branch))],
+    [name(' '.repeat(GAP_CELLS)), name(padEnd(truncateEnd('LANE', table.lane), table.lane))],
+  ]
+
+  if (table.ahead > 0) {
+    groups.push([name('AHEAD'.padStart(table.ahead))])
+  }
+
+  if (table.age > 0) {
+    groups.push([name('AGE'.padStart(table.age))])
+  }
+
+  if (table.hasNote) {
+    groups.push([name(' '.repeat(GAP_CELLS)), name('NOTE')])
+  }
+
+  // A column name is shown whole or not at all, never cut
+  return { key: 'columns', segments: fitWhole(groups, columns) }
+}
 
 /**
  * One of the header's controls, drawn as its hotkey, a colon and its label
@@ -359,53 +463,34 @@ export function noteOf(branch: BranchInfo, base: string): Segment[] {
  *
  * @param branch the branch
  * @param base the base branch's name
+ * @param table the queue's columns
  * @param columns the cells the row may take
- * @param branchCells the branch column's width
  * @param nowSeconds now, in seconds since the epoch
  * @returns the row
  */
-export function rowOf(branch: BranchInfo, base: string, columns: number, branchCells: number, nowSeconds: number): Line {
-  const isWide = columns >= WIDE_COLUMNS
-  const isMedium = columns >= MEDIUM_COLUMNS
-  const labels = isWide ? LANE_LABELS : SHORT_LANE_LABELS
-  const labelCells = Math.max(...Object.values(labels).map(label => label.length))
+export function rowOf(branch: BranchInfo, base: string, table: TableColumns, columns: number, nowSeconds: number): Line {
   const rank = branch.rank === null ? '-' : String(branch.rank)
   const segments: Segment[] = [
-    { text: `${rank.padStart(2)} `, bold: branch.rank !== null, dim: branch.rank === null },
-    { text: padEnd(truncateMiddle(sanitize(branch.name), branchCells), branchCells) },
-    { text: '  ' },
-    { text: padEnd(labels[branch.lane], labelCells), color: LANE_COLORS[branch.lane] },
+    { text: rank.padStart(RANK_CELLS - 1).padEnd(RANK_CELLS), bold: branch.rank !== null, dim: branch.rank === null },
+    { text: padEnd(truncateMiddle(sanitize(branch.name), table.branch), table.branch) },
+    { text: ' '.repeat(GAP_CELLS) },
+    { text: padEnd(table.labels[branch.lane], table.lane), color: LANE_COLORS[branch.lane] },
   ]
 
-  if (isWide) {
-    segments.push({ text: (branch.ahead > 0 ? `+${branch.ahead}` : '').padStart(AHEAD_CELLS), dim: true })
+  if (table.ahead > 0) {
+    segments.push({ text: (branch.ahead > 0 ? `+${branch.ahead}` : '').padStart(table.ahead), dim: true })
   }
 
   // The age of a branch with work of its own, beside what it has ahead
-  if (isMedium) {
-    const age = branch.ahead > 0 ? ageOf(nowSeconds - branch.lastCommitAt) : ''
+  if (table.age > 0) {
+    segments.push({ text: (branch.ahead > 0 ? ageOf(nowSeconds - branch.lastCommitAt) : '').padStart(table.age), dim: true })
+  }
 
-    segments.push({ text: age.padStart(AGE_CELLS), dim: true }, { text: '  ' }, ...noteOf(branch, base))
+  if (table.hasNote) {
+    segments.push({ text: ' '.repeat(GAP_CELLS) }, ...noteOf(branch, base))
   }
 
   return { key: `row:${branch.name}`, segments: fitSegments(segments, columns) }
-}
-
-/**
- * The width of the branch column: the longest name, within a share of the
- * row that leaves the lane and some note in view.
- *
- * @param branches the rows' branches
- * @param columns the cells a row may take
- * @returns the column's width in cells
- */
-export function branchCellsOf(branches: readonly BranchInfo[], columns: number): number {
-  const longest = Math.max(6, ...branches.map(branch => cellWidth(sanitize(branch.name))))
-  const share = columns >= WIDE_COLUMNS ? 0.4 : columns >= MEDIUM_COLUMNS ? 0.45 : 0.5
-  const labelCells = columns >= WIDE_COLUMNS ? 12 : 6
-  const fixed = 3 + 2 + labelCells + (columns >= WIDE_COLUMNS ? AHEAD_CELLS : 0) + (columns >= MEDIUM_COLUMNS ? AGE_CELLS : 0)
-
-  return Math.max(1, Math.min(longest, Math.floor(columns * share), columns - fixed))
 }
 
 /**
@@ -441,11 +526,8 @@ function headerOf(model: BandModel, snapshot: Snapshot | null, columns: number):
     return { key: 'header', segments: fitSegments(segments, headerRoomOf(model, columns)) }
   }
 
-  const counts: Segment[] = (Object.keys(LANE_LABELS) as Lane[]).flatMap(lane => {
-    const count = snapshot.branches.filter(branch => branch.lane === lane).length
-
-    return count === 0 ? [] : [{ text: ' · ', dim: true }, { text: `${count} ${LANE_LABELS[lane]}`, color: LANE_COLORS[lane] }]
-  })
+  const counts = countsOf(snapshot)
+  const then: Segment[] = counts.length === 0 ? [] : [{ text: ' · ', dim: true }, ...counts]
 
   // Compact, the header is the whole band: what lands next comes first, the
   // part a narrow band cuts last
@@ -457,21 +539,135 @@ function headerOf(model: BandModel, snapshot: Snapshot | null, columns: number):
         ? [{ text: 'nothing ready', dim: true }]
         : [{ text: 'next → ', dim: true }, { text: sanitize(snapshot.next), color: 'success' as const, bold: true }]),
       ...(model.problem === null ? [] : [{ text: ' · ', dim: true }, { text: 'last read failed', color: 'error' as const }]),
-      ...counts,
+      ...then,
     ]
 
     return { key: 'header', segments: fitSegments(compact, headerRoomOf(model, columns)) }
   }
 
-  segments.push({ text: ` → ${sanitize(snapshot.base.name)}`, dim: true }, ...counts)
+  segments.push({ text: ` → ${sanitize(snapshot.base.name)}`, dim: true }, ...then)
 
   return { key: 'header', segments: fitSegments(segments, headerRoomOf(model, columns)) }
 }
 
 /**
- * The foot: what lands next, the caller's line, and what to know.
+ * Keeps whole groups of runs while they fit, in order, and stops at the
+ * first that does not: for lines where a cut piece would read wrong (the
+ * column names, the counts).
+ *
+ * @param groups the groups, each drawn whole or not at all
+ * @param cells the cells they may take
+ * @returns the runs of the groups that fit
  */
-function footOf(model: BandModel, snapshot: Snapshot, columns: number): Line {
+export function fitWhole(groups: readonly (readonly Segment[])[], cells: number): Segment[] {
+  const out: Segment[] = []
+  let left = cells
+
+  for (const group of groups) {
+    const width = lineWidthOf({ key: '', segments: group })
+
+    if (width > left) {
+      break
+    }
+
+    out.push(...group)
+    left -= width
+  }
+
+  return out
+}
+
+/**
+ * What each lane holds, in lane order, one group per lane after the first
+ * led by its separator: `3 ready`, ` · 1 stacked`.
+ */
+function countGroupsOf(snapshot: Snapshot): Segment[][] {
+  const groups: Segment[][] = []
+
+  for (const lane of Object.keys(LANE_LABELS) as Lane[]) {
+    const count = snapshot.branches.filter(branch => branch.lane === lane).length
+
+    if (count > 0) {
+      groups.push([...(groups.length === 0 ? [] : [{ text: ' · ', dim: true }]), { text: `${count} ${LANE_LABELS[lane]}`, color: LANE_COLORS[lane] }])
+    }
+  }
+
+  return groups
+}
+
+/**
+ * What each lane holds, in lane order: `3 ready`, `1 stacked`.
+ */
+function countsOf(snapshot: Snapshot): Segment[] {
+  return (Object.keys(LANE_LABELS) as Lane[]).flatMap((lane, at, lanes) => {
+    const count = snapshot.branches.filter(branch => branch.lane === lane).length
+    const isFirst = lanes.slice(0, at).every(earlier => !snapshot.branches.some(branch => branch.lane === earlier))
+
+    return count === 0
+      ? []
+      : [...(isFirst ? [] : [{ text: ' · ', dim: true }]), { text: `${count} ${LANE_LABELS[lane]}`, color: LANE_COLORS[lane] }]
+  })
+}
+
+/**
+ * The summary at the foot's right end, longest first: the radar, the
+ * repository and its base, and the counts; a narrow band drops the title,
+ * then the repository, and keeps the counts.
+ */
+function summariesOf(model: BandModel, snapshot: Snapshot): Segment[][] {
+  const counts = countsOf(snapshot)
+  const place: Segment = {
+    text: `${sanitize(nameOf(snapshot.repo || model.root))} → ${sanitize(snapshot.base.name)}`,
+    dim: true,
+  }
+  const then: Segment[] = counts.length === 0 ? [] : [{ text: ' · ', dim: true }, ...counts]
+
+  return [[{ text: BAND_TITLE, bold: true }, { text: ' · ', dim: true }, place, ...then], [place, ...then], counts]
+}
+
+/**
+ * Cells between the foot's left part and the summary, at the least.
+ */
+const FOOT_GAP_CELLS = 3
+
+/**
+ * The foot: what lands next, the caller's line and what to know on the
+ * left; the summary right-aligned, when there is room for some of it.
+ */
+function footOf(model: BandModel, snapshot: Snapshot, columns: number, hasSummary = true): Line {
+  const left = footLeftOf(model, snapshot)
+  const leftCells = lineWidthOf({ key: '', segments: left })
+
+  // With no queue, the title stands on top and says it all
+  if (!hasSummary) {
+    return { key: 'foot', segments: fitSegments(left, columns) }
+  }
+
+  for (const summary of summariesOf(model, snapshot)) {
+    const cells = lineWidthOf({ key: '', segments: summary })
+
+    if (leftCells + FOOT_GAP_CELLS + cells <= columns) {
+      return { key: 'foot', segments: [...left, { text: ' '.repeat(columns - leftCells - cells) }, ...summary] }
+    }
+  }
+
+  // Short of room for every count, the ones that fit whole, right-aligned
+  const counts = fitWhole(countGroupsOf(snapshot), columns - leftCells - FOOT_GAP_CELLS)
+  const countCells = lineWidthOf({ key: '', segments: counts })
+
+  return {
+    key: 'foot',
+    segments:
+      countCells > 0
+        ? [...left, { text: ' '.repeat(columns - leftCells - countCells) }, ...counts]
+        : fitSegments(left, columns),
+  }
+}
+
+/**
+ * The foot's left part: what lands next, then what to know.
+ */
+function footLeftOf(model: BandModel, snapshot: Snapshot): Segment[] {
   const segments: Segment[] =
     snapshot.next === null
       ? [{ text: 'nothing ready to land', dim: true }]
@@ -494,7 +690,7 @@ function footOf(model: BandModel, snapshot: Snapshot, columns: number): Line {
     segments.push({ text: ' · ', dim: true }, { text: `last read failed: ${sanitize(model.problem)}`, color: 'error' })
   }
 
-  return { key: 'foot', segments: fitSegments(segments, columns) }
+  return segments
 }
 
 function nameOf(path: string): string {
@@ -538,18 +734,19 @@ export function bandLinesOf(model: BandModel): Line[] {
   if (model.isCompact) {
     return [header]
   }
-  const foot = footOf(model, snapshot, columns)
-
   if (snapshot.branches.length === 0) {
     return [
       header,
       { key: 'empty', segments: fitSegments([{ text: `no branches besides ${sanitize(snapshot.base.name)}`, dim: true }], columns) },
-      foot,
+      footOf(model, snapshot, columns, false),
     ]
   }
 
+  const foot = footOf(model, snapshot, columns)
+
   const nowSeconds = Math.floor(model.now / 1000)
   const folded = new Set<Lane>()
+  // The column names and the foot take a row each
   const room = Math.max(model.maxRows - 2, 1)
   const rowsWith = (): number =>
     snapshot.branches.filter(branch => !folded.has(branch.lane)).length +
@@ -566,9 +763,8 @@ export function bandLinesOf(model: BandModel): Line[] {
     }
   }
 
-  const shown = snapshot.branches.filter(branch => !folded.has(branch.lane))
-  const branchCells = branchCellsOf(shown, columns)
-  const lines: Line[] = [header]
+  const table = tableColumnsOf(columns)
+  const lines: Line[] = [columnHeaderOf(table, headerRoomOf(model, columns))]
 
   for (const lane of Object.keys(LANE_LABELS) as Lane[]) {
     const inLane = snapshot.branches.filter(branch => branch.lane === lane)
@@ -580,7 +776,7 @@ export function bandLinesOf(model: BandModel): Line[] {
     if (folded.has(lane)) {
       lines.push(foldedLineOf(lane, inLane, columns))
     } else {
-      lines.push(...inLane.map(branch => rowOf(branch, snapshot.base.name, columns, branchCells, nowSeconds)))
+      lines.push(...inLane.map(branch => rowOf(branch, snapshot.base.name, table, columns, nowSeconds)))
     }
   }
 

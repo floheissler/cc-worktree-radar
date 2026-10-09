@@ -51,11 +51,10 @@ describe('the band laid out', () => {
   test('a header, a row per branch in lane order, and the next to land', async () => {
     const lines = bandLinesOf(modelOf(await fixtureSnapshot(), { columns: 140 }))
 
-    expect(textOf(lines[0])).toBe(
-      'Worktree Radar · work → main · 4 ready · 2 needs rebase · 1 stacked · 1 in progress · 1 on hold · 2 cleanup',
-    )
+    // The column names on top, the summary right-aligned in the foot
+    expect(textOf(lines[0])).toMatch(/^ # BRANCH +LANE +AHEAD  AGE  NOTE$/)
     expect(lines.map(line => line.key)).toEqual([
-      'header',
+      'columns',
       'row:feat/parent',
       'row:feat/ready-a',
       'row:feat/big',
@@ -71,8 +70,32 @@ describe('the band laid out', () => {
     ])
     expect(textOf(lines[1])).toMatch(/^ 1 feat\/parent\s+ready\s+\+1 +\d+[smhd]  feat\/child stacked on it · merges cleanly$/)
     expect(textOf(lines[5])).toMatch(/^ - feat\/conflict2\s+needs rebase\s+\+1 +\d+[smhd]  conflicts: a\.txt · rebase after feat\/ready-a/)
-    expect(textOf(lines.find(line => line.key === 'row:chore/merged'))).toMatch(/^ - chore\/merged\s+cleanup {16}nothing beyond main$/)
-    expect(textOf(lines.at(-1))).toBe('next → feat/parent')
+    expect(textOf(lines.find(line => line.key === 'row:chore/merged'))).toMatch(/^ - chore\/merged\s+cleanup +nothing beyond main$/)
+    expect(textOf(lines.at(-1))).toMatch(
+      /^next → feat\/parent +Worktree Radar · work → main · 4 ready · 2 needs rebase · 1 stacked · 1 in progress · 1 on hold · 2 cleanup$/,
+    )
+    expect(lineWidthOf(lines.at(-1) as Line)).toBe(140)
+  })
+
+  test('columns start on the same cell in every row, whatever the branch names', async () => {
+    const snapshot = await fixtureSnapshot()
+    const long = {
+      ...snapshot,
+      branches: snapshot.branches.map(branch =>
+        branch.name === 'feat/big' ? { ...branch, name: 'feat/a-very-long-branch-name-that-goes-on-and-on' } : branch,
+      ),
+    }
+
+    for (const columns of [50, 80, 140]) {
+      const short = bandLinesOf(modelOf(snapshot, { columns }))
+      const wide = bandLinesOf(modelOf(long, { columns }))
+      const laneAt = (line: Line | undefined) => textOf(line).search(/ready|rebase|needs rebase/)
+
+      // The lane column starts where its name does, in both repositories
+      expect(laneAt(short[1]), `${columns}`).toBe(textOf(short[0]).indexOf('LANE'))
+      expect(laneAt(wide[1]), `${columns}`).toBe(laneAt(short[1]))
+      expect(textOf(wide[0])).toBe(textOf(short[0]))
+    }
   })
 
   test('colors each lane with a theme key', async () => {
@@ -92,7 +115,7 @@ describe('the band laid out', () => {
 
     for (let columns = 1; columns <= 160; columns += 1) {
       for (const line of bandLinesOf(modelOf(snapshot, { columns, status: 'release v0.4.1 pending', problem: 'boom' }))) {
-        const room = line.key === 'header' ? columns - controlsCellsOf(controlsOf(columns, false, false)) : columns
+        const room = line.key === 'columns' ? columns - controlsCellsOf(controlsOf(columns, false, false)) : columns
 
         expect(lineWidthOf(line), `${line.key} at ${columns}`).toBeLessThanOrEqual(Math.max(room, 0))
       }
@@ -123,7 +146,7 @@ describe('the band laid out', () => {
     const lines = bandLinesOf(modelOf(more, { maxRows: 11 }))
 
     expect(lines.map(line => line.key)).toEqual([
-      'header',
+      'columns',
       'row:feat/parent',
       'row:feat/ready-a',
       'row:feat/big',
@@ -148,10 +171,11 @@ describe('the band laid out', () => {
   test('the caller line, a dirty main worktree and a failed read go in the foot', async () => {
     const snapshot = await fixtureSnapshot()
     const dirty = { ...snapshot, base: { ...snapshot.base, mainWorktreeDirty: 2 }, areSessionsKnown: false }
-    const foot = bandLinesOf(modelOf(dirty, { columns: 200, status: 'release v0.4.1 pending', problem: 'index.lock' })).at(-1)
+    const foot = bandLinesOf(modelOf(dirty, { columns: 210, status: 'release v0.4.1 pending', problem: 'index.lock' })).at(-1)
 
-    expect(textOf(foot)).toBe(
-      'next → feat/parent · release v0.4.1 pending · main worktree: 2 uncommitted · sessions unknown · last read failed: index.lock',
+    // Short of room for the whole summary, the foot keeps its counts
+    expect(textOf(foot)).toMatch(
+      /^next → feat\/parent · release v0\.4\.1 pending · main worktree: 2 uncommitted · sessions unknown · last read failed: index\.lock +4 ready · 2 needs rebase · 1 stacked · 1 in progress · 1 on hold · 2 cleanup$/,
     )
   })
 
