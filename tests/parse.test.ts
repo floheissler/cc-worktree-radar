@@ -2,7 +2,6 @@ import { describe, expect, test } from 'claude-code/testing'
 
 import { baseOf, countStatus, displayPathOf, parseHeads, parseWorktrees, type Head } from '../hooks/repo'
 import { folderKeyOf, parseSessions, sessionsByWorktree } from '../hooks/sessions'
-import { sweepCellsOf } from '../hooks/sweep'
 
 const head = (sha: string): Head => ({ sha, committedAt: 1, upstream: null })
 
@@ -94,14 +93,5 @@ describe('sessions', () => {
     )
 
     expect(attached.get('C:/Users/Flo/repo')).toHaveLength(1)
-  })
-})
-
-describe('the sweep cell', () => {
-  test('packs a glyph in Claude orange on the terminal background', () => {
-    const bytes = Uint8Array.from(atob(sweepCellsOf('◜')), char => char.charCodeAt(0))
-    const words = new Uint32Array(bytes.buffer)
-
-    expect([...words]).toEqual(['◜'.codePointAt(0), 0xd97757, 0x01000000])
   })
 })

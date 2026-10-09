@@ -1,5 +1,5 @@
 import { atom, read, update } from 'claude-code'
-import type { ElementTable, EngineInterface, PluginOptions, Register } from 'claude-code'
+import type { EngineInterface, PluginOptions, Register } from 'claude-code'
 
 import type { RadarConfig } from '../types'
 
@@ -8,8 +8,7 @@ import type { Host, RadarOptions } from './host'
 import Limits from './limits'
 import { BAND_TITLE, COMMAND_DESCRIPTION, COMMAND_HINT } from './names'
 import { createRadar, type Radar } from './radar'
-import { createSweep, type Sweep, type SweepHost } from './sweep'
-import { bandLinesOf, controlsOf, frameOf, sweepOf } from './rows'
+import { bandLinesOf, controlsOf, frameOf } from './rows'
 import { clipChars, messageOf, sanitize } from './text'
 import { TOOL_DESCRIPTION, TOOL_INPUT_SCHEMA, toolJsonOf, toolRequestOf } from './tool'
 import { bandView } from './view'
@@ -126,28 +125,6 @@ function hostOf($: EngineInterface, options: RadarOptions): Host {
 }
 
 /**
- * How many check intervals may pass with no check before the sweep stops
- * turning: a read in progress takes a while, a stalled radar takes longer.
- */
-const LIVE_INTERVALS = 3
-
-/**
- * Binds the sweep's engine calls to one hook's `$`.
- *
- * @param $ the engine, as the band's render hook receives it
- * @param radar the radar, for when it last checked
- * @param options the person's settings
- * @returns the calls
- */
-function sweepHostOf($: EngineInterface, radar: Radar, options: RadarOptions): SweepHost {
-  return {
-    after: (ms, fn) => $.clock.after(ms, fn),
-    blit: async (requestId, key, cells) => (await $.ui.blit({ requestId, key, cells })).deny === undefined,
-    isLive: async () => (await $.clock.now()) - radar.lastCheckAt() <= options.pollMs * LIVE_INTERVALS,
-  }
-}
-
-/**
  * Opens the radar on a folder, replacing one open before, and starts its
  * polls; the first read follows at once.
  *
@@ -164,9 +141,8 @@ async function openRadar(host: Host, radar: Radar, config: RadarConfig): Promise
   await radar.start(host)
 }
 
-async function closeRadar(host: Host, radar: Radar, sweep?: Sweep): Promise<void> {
+async function closeRadar(host: Host, radar: Radar): Promise<void> {
   radar.stop()
-  sweep?.stop()
   await host.state.radar.set(() => null)
   await host.state.snapshot.set(() => null)
   await host.state.problem.set(() => null)
@@ -195,7 +171,6 @@ async function answerOf(host: Host): Promise<{ result: string } | { deny: string
 export const register: Register = (on, pluginOptions) => {
   const options = optionsOf(pluginOptions)
   const radar = createRadar()
-  const sweep = createSweep()
 
   on('session.start', async ($, e, next) => {
     try {
@@ -240,7 +215,7 @@ export const register: Register = (on, pluginOptions) => {
     switch (request.kind) {
       case 'toggle':
         if (open !== null) {
-          await closeRadar(host, radar, sweep)
+          await closeRadar(host, radar)
         } else {
           void openRadar(host, radar, { root, base: null, wake: [] }).catch(() => undefined)
         }
@@ -253,7 +228,7 @@ export const register: Register = (on, pluginOptions) => {
 
         return {}
       case 'close':
-        await closeRadar(host, radar, sweep)
+        await closeRadar(host, radar)
 
         return {}
       case 'help':
@@ -299,7 +274,7 @@ export const register: Register = (on, pluginOptions) => {
 
         return answerOf(host)
       case 'close':
-        await closeRadar(host, radar, sweep)
+        await closeRadar(host, radar)
 
         return { result: 'The radar is closed.' }
       case 'snapshot':
@@ -369,12 +344,6 @@ export const register: Register = (on, pluginOptions) => {
     ])
     const columns = e.props.bodyColumns
     const frame = frameOf(columns, e.props.maxRows)
-    const table = $.ui.resolve(e)
-    // The terminal turns the sweep in a cell of its own, between drawings;
-    // elsewhere it moves a step per check, with each drawing
-    const raster =
-      e.surface === 'terminal' && typeof e.requestId === 'string' ? (table as ElementTable<'terminal'>).Raster : null
-    const glyph = raster === null ? sweepOf(now, options.pollMs) : sweep.glyph()
     const lines = bandLinesOf({
       snapshot,
       problem,
@@ -385,15 +354,10 @@ export const register: Register = (on, pluginOptions) => {
       maxRows: frame.maxRows,
       isHelpShown,
       isCompact,
-      sweep: glyph,
     })
     const controls = controlsOf(frame.columns, isHelpShown, isCompact)
 
-    if (raster !== null && typeof e.requestId === 'string' && lines.some(line => line.segments.some(segment => segment.isSweep))) {
-      sweep.ensure(sweepHostOf($, radar, options), e.requestId)
-    }
-
-    return bandView(table, lines, columns, frame, controls, {
+    return bandView($.ui.resolve(e), lines, columns, frame, controls, {
       help: () => {
         void hostOf($, options).state.helpShown.set(shown => !shown)
       },
@@ -401,8 +365,8 @@ export const register: Register = (on, pluginOptions) => {
         void hostOf($, options).state.compact.set(compact => !compact)
       },
       exit: () => {
-        void closeRadar(hostOf($, options), radar, sweep)
+        void closeRadar(hostOf($, options), radar)
       },
-    }, raster)
+    })
   })
 }

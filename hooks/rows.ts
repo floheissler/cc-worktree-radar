@@ -19,11 +19,6 @@ export type Segment = {
   readonly color?: ThemeKey
   readonly dim?: boolean
   readonly bold?: boolean
-  /**
-   * The sweep's glyph: the terminal draws it in a cell of its own, which
-   * turns without a redraw (`view.tsx`).
-   */
-  readonly isSweep?: true
 }
 
 export type Line = {
@@ -62,35 +57,14 @@ export type BandModel = {
    * Whether the queue is folded into the header's one line.
    */
   readonly isCompact: boolean
-  /**
-   * The sweep's glyph this drawing (`sweepOf`).
-   */
-  readonly sweep: string
 }
 
 /**
- * The radar's sweep: one step per check, so a turning glyph says the radar
- * is alive, and a still one that it stalled.
+ * The band's title, leading the status line (the foot, or the compact
+ * line).
  */
-export const SWEEP_FRAMES = ['◜', '◝', '◞', '◟'] as const
-
-/**
- * The sweep's glyph at a time: the step of the check it falls in.
- *
- * @param now milliseconds since the epoch
- * @param pollMs between two checks
- * @returns the glyph
- */
-export function sweepOf(now: number, pollMs: number): string {
-  return SWEEP_FRAMES[Math.floor(now / Math.max(pollMs, 1)) % SWEEP_FRAMES.length] as string
-}
-
-/**
- * The band's title: the sweep and the name, leading the status line (the
- * foot, or the compact line).
- */
-export function titleOf(sweep: string): Segment[] {
-  return [{ text: sweep, color: 'claude', isSweep: true }, { text: ' ' }, { text: BAND_TITLE, bold: true }]
+export function titleOf(): Segment[] {
+  return [{ text: BAND_TITLE, bold: true }]
 }
 
 export const LANE_LABELS: Readonly<Record<Lane, string>> = {
@@ -616,7 +590,7 @@ function headerOf(model: BandModel, snapshot: Snapshot | null, columns: number):
       key: 'header',
       segments: fitSegments(
         joined([
-          titleOf(model.sweep),
+          titleOf(),
           model.problem === null ? [{ text: `reading ${repo}…`, dim: true }] : [{ text: sanitize(model.problem), color: 'error' }],
         ]),
         room,
@@ -693,19 +667,17 @@ function countsOf(snapshot: Snapshot, labels: Readonly<Record<Lane, string>> = L
 /**
  * The status line's layouts, fullest first: the title, the place, the
  * counts and what lands next; then the counts in short labels, then without
- * the title (the sweep stays), without the place, without the counts.
+ * the title, without the place, without the counts.
  */
 function statusLayoutsOf(model: BandModel, snapshot: Snapshot, after: readonly Segment[]): Segment[][] {
   const place = placeOf(model, snapshot)
   const counts = countsOf(snapshot)
   const short = countsOf(snapshot, SHORT_LANE_LABELS)
   const next = nextOf(snapshot)
-  const sweptPlace: Segment[] = [{ text: model.sweep, color: 'claude', isSweep: true }, { text: ' ' }, ...place]
 
   return [
-    joined([titleOf(model.sweep), place, counts, next, after]),
-    joined([titleOf(model.sweep), place, short, next, after]),
-    joined([sweptPlace, short, next, after]),
+    joined([titleOf(), place, counts, next, after]),
+    joined([titleOf(), place, short, next, after]),
     joined([place, short, next, after]),
     joined([short, next, after]),
     joined([next, after]),
@@ -730,7 +702,7 @@ const MESSAGE_OUTRANKS = 3
  * what each lane holds, what lands next. Its right end is for messages: a
  * caller's line, then what to know (uncommitted files in the main worktree,
  * sessions unknown, a failed read). A narrow band gives up the messages,
- * then the long lane labels, the title (the sweep stays), the place and the
+ * then the long lane labels, the title, the place and the
  * counts, before what lands next.
  */
 function footOf(model: BandModel, snapshot: Snapshot, columns: number): Line {
@@ -964,7 +936,6 @@ export function helpLinesOf(base: string, columns: number): Line[] {
     {
       title: 'Status line',
       entries: [
-        { term: { text: `${SWEEP_FRAMES[0]} Worktree Radar`, color: 'claude' }, meaning: 'the sweep turns while the radar checks the repository: when it stands still, the radar has stalled' },
         { term: { text: `repo [${onto}]` }, meaning: `the repository, and the base branch everything lands on` },
         { term: { text: '3 ready · 1 stacked' }, meaning: 'how many branches each lane holds' },
         { term: { text: 'land next → X' }, meaning: 'the branch ranked #1' },

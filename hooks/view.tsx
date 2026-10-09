@@ -1,19 +1,12 @@
 import type { ElementTable, RenderElement } from 'claude-code'
 
 import type { Control, Frame, Line, Segment } from './rows'
-import { SWEEP_KEY, sweepCellsOf } from './sweep'
 
 /**
  * The elements the band draws with, from the table `$.ui.resolve(e)` hands
  * the render hook: the band is raised on the terminal and the desktop.
  */
 export type Ui = Pick<ElementTable<'terminal' | 'desktop'>, 'Box' | 'Text' | 'Button'>
-
-/**
- * The terminal's one-cell grid the sweep turns in; the desktop has none and
- * draws the glyph as text.
- */
-export type RasterElement = ElementTable<'terminal'>['Raster']
 
 /**
  * What the band's controls do, by their keys.
@@ -39,7 +32,6 @@ export const FRAME_STYLE = { borderStyle: 'round', borderColor: 'promptBorder', 
  * @param frame the frame, from `frameOf`
  * @param controls the first line's controls, from `controlsOf`
  * @param actions what the controls do
- * @param raster the terminal's Raster, for the sweep; null to draw it as text
  * @returns the band's tree
  */
 export function bandView(
@@ -49,7 +41,6 @@ export function bandView(
   frame: Frame,
   controls: readonly Control[],
   actions: BandActions,
-  raster: RasterElement | null,
 ): RenderElement {
   const { Box, Text, Button } = ui
   const runs = (segments: readonly Segment[]) =>
@@ -63,26 +54,6 @@ export function bandView(
         {segment.text}
       </Text>
     ))
-
-  // A line with the sweep draws it as its own cell, which turns by blits
-  const lineView = (line: Line) => {
-    const at = raster === null ? -1 : line.segments.findIndex(segment => segment.isSweep)
-    const glyph = line.segments[at]
-
-    if (raster === null || glyph === undefined) {
-      return <Text wrap="truncate-end">{runs(line.segments)}</Text>
-    }
-
-    const Raster = raster
-
-    return [
-      ...(at > 0 ? [<Text key="before">{runs(line.segments.slice(0, at))}</Text>] : []),
-      <Raster key={SWEEP_KEY} columns={1} rows={1} cells={sweepCellsOf(glyph.text)} />,
-      <Text key="after" wrap="truncate-end">
-        {runs(line.segments.slice(at + 1))}
-      </Text>,
-    ]
-  }
 
   return (
     <Box flexDirection="column" width={columns} {...(frame.isFramed ? FRAME_STYLE : {})}>
@@ -98,7 +69,9 @@ export function bandView(
               <Text color={FRAME_STYLE.borderColor}>─</Text>
             </Box>
           ) : null}
-          <Box flexGrow={1} flexShrink={1} flexDirection="row">{lineView(line)}</Box>
+          <Box flexGrow={1} flexShrink={1}>
+            <Text wrap="truncate-end">{runs(line.segments)}</Text>
+          </Box>
           {at === 0 ? (
             <Box flexDirection="row" flexShrink={0} columnGap={1} marginLeft={1}>
               {controls.map(control => (

@@ -7,15 +7,15 @@ which are stacked on another, which a Claude session is still working on,
 and the order to land them in.
 
 ```
-╭────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-│  # BRANCH         LANE        AHEAD  AGE  NOTE                                                      h: help c: compact x: exit │
-│  1 feat/checkout  ready          +4  12m                                                                                       │
-│  2 fix/totals     ready          +1   3m  forces a rebase of feat/coupons                                                      │
-│  - feat/coupons   needs rebase   +6  20m  conflicts: cart.ts · rebase after #2 fix/totals                                      │
-│  - feat/search    in progress    +2   1m  search-worker busy                                                                   │
-│────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────│
-│ ◜ Worktree Radar · shop [main] · 2 ready · 1 needs rebase · 1 in progress · land next → feat/checkout   release v0.4.1 pending │
-╰────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│  # BRANCH         LANE        AHEAD  AGE  NOTE                                                    h: help c: compact x: exit │
+│  1 feat/checkout  ready          +4  12m                                                                                     │
+│  2 fix/totals     ready          +1   3m  forces a rebase of feat/coupons                                                    │
+│  - feat/coupons   needs rebase   +6  20m  conflicts: cart.ts · rebase after #2 fix/totals                                    │
+│  - feat/search    in progress    +2   1m  search-worker busy                                                                 │
+│──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────│
+│ Worktree Radar · shop [main] · 2 ready · 1 needs rebase · 1 in progress · land next → feat/checkout   release v0.4.1 pending │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
 ```
 
 It only looks. It never merges, rebases, tags, pushes or moves a ref.
@@ -54,9 +54,7 @@ The band is framed like a panel, with three controls in its header:
 | `c: compact` | folds the radar into one line: what lands next, then the counts; `c: expand` brings the queue back |
 | `x: exit` | closes the radar, as `/radar` does |
 
-Under a divider, the status line reads left to right: the sweep (`◜`, in
-Claude orange, turning while the radar checks the repository; standing
-still means the radar stalled) and the title, the
+Under a divider, the status line reads left to right: the title, the
 repository and its base (`shop [main]`), what each lane holds, and what
 lands next. Its right end holds messages: a skill's status line, uncommitted
 files in the main worktree, a failed read. On a narrow band the messages go
