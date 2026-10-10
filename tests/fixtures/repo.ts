@@ -206,8 +206,7 @@ export const RUNS: Readonly<Record<string, { readonly code: number; readonly std
 export const HOLDS = {"feat/clean":{"reason":"waiting on review","at":1}}
 
 /**
- * What the read must say, checked against the Python pipeline this port
- * came from.
+ * What the read must say about each branch.
  */
 export const EXPECTED = [
   {

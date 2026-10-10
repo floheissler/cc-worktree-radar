@@ -6,9 +6,8 @@ the repository and the order they can land on its base branch. The
 repository is the plugin and its own marketplace (`cc-worktree-radar`, one
 entry with `"source": "./"`). README.md has the user-facing behavior.
 
-Work in progress: `ROADMAP.md` (gitignored, local) is the plan toward
-v0.1.0, a checklist with context for each item. Start there when asked to
-work on the next item.
+The maintainer keeps a local, gitignored `ROADMAP.md`: where it exists
+and you are asked for the next item, start there.
 
 ## Scope: facts, never policy
 
@@ -46,10 +45,9 @@ work on the next item.
 - `hooks/saved.ts`: the radar a session left open, kept in the store for
   its resume: the record, its checked reading, the save, the forget and
   the cap.
-- `hooks/analysis.ts`: the read itself, ported from the owner's private
-  `merge-pipeline` script (`pipeline.py snapshot`): lanes, simulated merges,
-  stacking, knock-on conflicts, READY's ranking, the rebase order, and each
-  branch's one-line `summary`.
+- `hooks/analysis.ts`: the read itself: lanes, simulated merges, stacking,
+  knock-on conflicts, READY's ranking, the rebase order, and each branch's
+  one-line `summary`.
 - `hooks/repo.ts`: git's branches and worktrees, read and parsed; the base.
 - `hooks/sessions.ts`: `claude agents --json`, and which worktree each
   session works in; Claude Code's worktree locks, and which worktree each
@@ -66,10 +64,9 @@ work on the next item.
   widths and `sanitize`, carried over from cc-file-explorer unchanged.
 - `tests/`: `claude plugin test` suites. `fixtures/repo.ts` is a recording
   of every git run of one read of a real test repository (paths rewritten to
-  `/work`), checked against `pipeline.py`'s own answers; `replay.ts` answers
-  git from it. `band.test.ts` mounts the band and drives `/radar` and the
-  tool through the engine, and sessions ending, starting and resuming over
-  a store it reads.
+  `/work`); `replay.ts` answers git from it. `band.test.ts` mounts the band
+  and drives `/radar` and the tool through the engine, and sessions ending,
+  starting and resuming over a store it reads.
 
 ## Rules the engine's static scan enforces
 
@@ -88,28 +85,27 @@ the module otherwise:
 
 ## Conventions
 
-- The analysis stays behavior-compatible with `pipeline.py snapshot` for
-  every fact the script computes, minus releases and hand-backs, and one
-  deliberate difference: a branch with nothing left to land that landed
-  (`isLanded`) reads so, and an idle session left in its worktree keeps it
-  in CLEANUP, where the script showed IN_PROGRESS "no commits yet". It
-  landed through a merge when its tip is off the base's first-parent line
-  (`git rev-list --first-parent`, up to `FIRST_PARENT_COMMITS`). A
-  fast-forward leaves no merge, its tip on that line like a fresh branch's,
-  so the branch's own reflog decides (`ownWorkOf`, `git reflog show`): it
-  landed when its latest own work is in the base (`git merge-base
+- A branch with nothing left to land reads `isLanded` when its work reached
+  the base, and an idle session left in its worktree then keeps it in
+  CLEANUP; on a branch that never had work, the session keeps it IN_PROGRESS
+  "no commits yet". It landed through a merge when its tip is off the base's
+  first-parent line (`git rev-list --first-parent`, up to
+  `FIRST_PARENT_COMMITS`). A fast-forward leaves no merge, its tip on that
+  line like a fresh branch's, so the branch's own reflog decides
+  (`ownWorkOf`, `git reflog show`): it landed when its latest own work is in
+  the base (`git merge-base
   --is-ancestor`). Own work is an entry git writes for a commit made on the
   branch (`commit`, `commit (amend)`, `cherry-pick`, `revert`, `am`; not
   `commit (merge)`), or a rebase's `(finish)` after one; creation,
   fast-forwards and resets bring none. These are literals in git's source,
   never translated (checked in `branch.c`, `builtin/commit.c`, `sequencer.c`,
   `builtin/am.c`, and live on git 2.53). Without a reflog (none kept,
-  expired) a branch reads fresh, as the script read it; a squash merge, its
+  expired) a branch reads fresh; a squash merge, its
   commits rewritten, stays undetected. To check a
   change against real git, run `hooks/analysis.ts` under Node (type
   stripping, with a resolve hook that adds `.ts`) on a throwaway repository
-  and compare with `pipeline.py -C <repo> snapshot --json`. Re-record
-  `tests/fixtures/repo.ts` the same way when the git runs change. The
+  and compare its answer with what git shows there. Re-record
+  `tests/fixtures/repo.ts` that way when the git runs change. The
   recording predates the reflog read: its reflog runs replay as missing (no
   reflog), and the reflog's path is tested with runs a test adds.
 - A read runs only once a change has settled (`SETTLE_MS`), one at a time
@@ -125,38 +121,37 @@ the module otherwise:
   agent still read at work 10 s after its hand-back; this is the likeliest
   cause, not proven: on 2.1.296 (instrumented, twice) the lock went with
   the agent's last state, which the poll caught anyway.
-- A worktree's `sessions` holds who works there: the sessions
-  `claude agents` lists, and subagents (`kind: 'agent'`). A session belongs
-  to the worktree whose `claude session` lock names its pid, else to the
-  deepest one holding its folder (`sessionsByWorktree`). The lock comes
-  first because the CLI can list a session in the folder it started from
-  after it moved into a worktree: seen live in the D3 dogfood, a background
-  job's new worktree read CLEANUP and woke `cleanup` while its worker was
-  in it. Claude Code unlocks a worktree a session leaves and keeps, and
-  releases stale locks. A
+- A worktree's `sessions` holds who works there: the sessions `claude
+  agents` lists, and subagents (`kind: 'agent'`). A session belongs to the
+  worktree whose `claude session` lock names its pid, else to the deepest
+  one holding its folder (`sessionsByWorktree`). The lock comes first
+  because the CLI can list a session in the folder it started from after it
+  moved into a worktree: seen live, a background job's new worktree read
+  CLEANUP and woke `cleanup` while its worker was in it. Claude Code unlocks
+  a worktree a session leaves and keeps, and releases stale locks. A
   subagent runs inside its parent's process, so the CLI lists no session in
   its worktree; the radar knows it by the worktree's lock
   (`agentsByWorktree`): an agent of the radar's own session while
   `$.agent.list()` says it is not over (its task, `description`, with it),
   another session's while that session's pid is listed. A running agent puts
   its branch IN_PROGRESS like a busy session; one that was at work and is
-  gone wakes `session-idle` ("finished"). The row's detail is
-  `agent: <task>`, or `agent of <session>`.
-- A worktree on its way out (`isBeingRemoved`): Claude Code removes a
-  closed job's or a finished agent's worktree entry by entry, its `.git`
-  file last, then drops git's record of it, then (not always) deletes the
-  branch (2.1.296). Meanwhile git lists it as
-  before and its status counts every deleted file. In the D3 dogfood that
-  took about a minute on `/mnt/c` (`node_modules`), and a simulation of it
-  read IN_PROGRESS "landed in main, new work under way · 9 uncommitted
-  files". It reads as removal when nobody works there and the status holds
-  tracked files gone (` D`) and nothing else but untracked ones, which a
-  deleted `.gitignore` uncovers (`isDeletionOnly`): the row says `worktree
-  being removed`, and a branch with nothing left to land stays CLEANUP. A
-  branch with commits stays IN_PROGRESS, so files gone never make it READY.
+  gone wakes `session-idle` ("finished"). The row's detail is `agent:
+  <task>`, or `agent of <session>`.
+- A worktree on its way out (`isBeingRemoved`): Claude Code removes a closed
+  job's or a finished agent's worktree entry by entry, its `.git` file last,
+  then drops git's record of it, then (not always) deletes the branch
+  (2.1.296). Meanwhile git lists it as before and its status counts every
+  deleted file. In a live run that took about a minute on `/mnt/c`
+  (`node_modules`), and a simulation of it read IN_PROGRESS "landed in main,
+  new work under way · 9 uncommitted files". It reads as removal when nobody
+  works there and the status holds tracked files gone (` D`) and nothing
+  else but untracked ones, which a deleted `.gitignore` uncovers
+  (`isDeletionOnly`): the row says `worktree being removed`, and a branch
+  with nothing left to land stays CLEANUP. A branch with commits stays
+  IN_PROGRESS, so files gone never make it READY.
 - The rebase order counts a branch as being rebased when its worktree is
   mid-rebase, or when it was found due a rebase (`dueMarks`) and is in
-  progress since. `pipeline.py` used its private hand-back records here.
+  progress since.
 - Events wake the session only for the kinds the caller listed at `open`,
   once per branch tip (`reported`, the module's), never on the first read.
   `/radar` lists none. A wake goes out through an outbox (`sendWakes`) that
@@ -232,56 +227,56 @@ the module otherwise:
   while a row shown has one, comment; medium drops ahead and the comments
   and shortens the lane labels; narrow keeps `#`, branch and lane. Its
   first row names the columns (`columnHeaderOf`), the controls at its end.
-- A row's text comes in two columns, by who wrote it. DETAIL (`detailOf`)
-  is the radar's own, from the facts alone: why the branch is in its lane
-  and what comes next. A ready row's detail says only what else there is (a
+- A row's text comes in two columns, by who wrote it. DETAIL (`detailOf`) is
+  the radar's own, from the facts alone: why the branch is in its lane and
+  what comes next. A ready row's detail says only what else there is (a
   stack on it, a rebase it forces): "merges cleanly" is what ready means; a
   cleanup row's says `has a worktree`, its path being the snapshot's.
-  COMMENT (`commentOf`) is a caller's, set through the tool's `comment`,
-  on the branch's tip (`CallerComment.sha`), or kept (`keep: true`,
-  `isKept`) on every tip until the branch lands or is gone, when a read
-  ends it (`commentsAfter`), so it does not come back on new work or a new
-  branch of that name. Kept comments came from the D3 dogfood: "merge once
-  READY", set on a branch with no commits yet, went with its first commit.
-  A comment is Claude's words, as only a model calls the tool, so marked
-  with the `✻` Claude Code draws its own lines with, in `claude`, and
-  quoted in italics in `inactive` (light grey on a dark theme), cut inside
-  its quotes. With a
+  COMMENT (`commentOf`) is a caller's, set through the tool's `comment`, on
+  the branch's tip (`CallerComment.sha`), or kept (`keep: true`, `isKept`)
+  on every tip until the branch lands or is gone, when a read ends it
+  (`commentsAfter`), so it does not come back on new work or a new branch of
+  that name. Kept comments came from a live run: "merge once READY", set on
+  a branch with no commits yet, went with its first commit. A comment is
+  Claude's words, as only a model calls the tool, so marked with the `✻`
+  Claude Code draws its own lines with, in `claude`, and quoted in italics
+  in `inactive` (light grey on a dark theme), cut inside its quotes. With a
   comment shown, DETAIL is as wide as its longest, up to `DETAIL_SHARE` of
   what the branch leaves, and COMMENT takes the rest, from
   `COMMENT_MIN_CELLS`. COMMENT reaches the row's end, under the header's
   controls, so it is also at least as wide as the controls plus its name,
   the detail giving up cells for that; with the detail left under
   `DETAIL_MIN_CELLS`, the comments go. Seen live: a long branch name left a
-  26-cell comment column starting where the controls did, its name gone
-  from the header. The facts (branch, ahead, age, detail) are in the
-  theme's text color; dim is for what is not data (the column names, the
-  ` · ` separators, the `-` off the landing order, a folded lane's line),
-  so the grey comment is the one quiet thing on a row. The detail was dim
-  before, the same grey as a comment. A caller's comment used to lead the note, in blue and
-  joined by ` · `; the owner could not tell where it ended and the radar's
-  words began. The caller's status line stays a blue badge, unquoted: it is
-  a status, not a comment. Under the frame, not in it (`view.tsx`), the
-  foot is a status line read left to right (`statusLayoutsOf`): the title,
-  `repo [base]`, the counts, `land next →`; messages (a caller's status,
-  what to know) right-aligned. What to know includes the main worktree:
-  who works there but the radar's own session (`mainWorktreeSessions`,
-  left out by `$.session.id()`, which is `claude agents`' `sessionId`) and
-  what is uncommitted there, in one message (`main worktree: session
-  fix-menu, 2 uncommitted`). From the D3 dogfood: two workers started in
-  the main worktree, the coordinator's own, where their work showed on no
-  row and a `git checkout -b` would have moved it off the base. Short of room it gives up, in order, the long
-  lane labels, the title, the place and the counts; a message may push out
-  the labels and the title (`MESSAGE_OUTRANKS`), never more. Compact, the
-  frame goes and the band is that status line alone (`headerOf`, the same
-  `statusLayoutsOf`), the controls at its end where the messages were, a
-  failed read the one message kept; an empty row above it so it stands
-  apart from Claude Code's spinner and tips as the frame's top edge does. `fitWhole` keeps whole
-  pieces where a cut one would read wrong. Dividers inside the frame were
-  tried and dropped for the frame itself: a solid dim rule, a dotted dim
-  rule, the rule in the frame's color reaching its sides (it split the panel
-  in two, without joints, as a mod cannot draw on the border) and a `╰` hook
-  before the status line, which read as a stray corner.
+  26-cell comment column starting where the controls did, its name gone from
+  the header. The facts (branch, ahead, age, detail) are in the theme's text
+  color; dim is for what is not data (the column names, the ` · `
+  separators, the `-` off the landing order, a folded lane's line), so the
+  grey comment is the one quiet thing on a row. The detail was dim before,
+  the same grey as a comment. A caller's comment used to lead the note, in
+  blue and joined by ` · `; the owner could not tell where it ended and the
+  radar's words began. The caller's status line stays a blue badge,
+  unquoted: it is a status, not a comment. Under the frame, not in it
+  (`view.tsx`), the foot is a status line read left to right
+  (`statusLayoutsOf`): the title, `repo [base]`, the counts, `land next →`;
+  messages (a caller's status, what to know) right-aligned. What to know
+  includes the main worktree: who works there but the radar's own session
+  (`mainWorktreeSessions`, left out by `$.session.id()`, which is `claude
+  agents`' `sessionId`) and what is uncommitted there, in one message (`main
+  worktree: session fix-menu, 2 uncommitted`). Seen live: two workers
+  started in the main worktree, the coordinator's own, where their work
+  showed on no row and a `git checkout -b` would have moved it off the base.
+  Short of room it gives up, in order, the long lane labels, the title, the
+  place and the counts; a message may push out the labels and the title
+  (`MESSAGE_OUTRANKS`), never more. Compact, the frame goes and the band is
+  that status line alone (`headerOf`, the same `statusLayoutsOf`), the
+  controls at its end where the messages were, a failed read the one message
+  kept; an empty row above it so it stands apart from Claude Code's spinner
+  and tips as the frame's top edge does. `fitWhole` keeps whole pieces where
+  a cut one would read wrong. Dividers inside the frame were tried and
+  dropped for the frame itself: a solid dim rule, a dotted dim rule, the
+  rule in the frame's color reaching its sides (it split the panel in two,
+  without joints, as a mod cannot draw on the border) and a `╰` hook before
+  the status line, which read as a stray corner.
 - The frame's border is Claude Code's, drawn over anything a mod lays on it:
   checked live on 2.1.295, a title placed with `position: "absolute"` over
   the top edge did not show, and overlays reach the padding cells only. So

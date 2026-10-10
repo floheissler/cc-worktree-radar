@@ -34,7 +34,7 @@ async function snapshotOf(input: ReadInput): Promise<Snapshot> {
 }
 
 describe('reading a repository', () => {
-  test('sorts every branch into the lane the Python pipeline gives it', async () => {
+  test('sorts every branch into its lane, ranks the ready ones and sums each up', async () => {
     const snapshot = await snapshotOf(inputOf(replayOf().run))
 
     expect(
