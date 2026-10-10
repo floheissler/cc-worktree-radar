@@ -541,11 +541,36 @@ function branchOf(info: Facts, facts: ReadonlyMap<string, Facts>, base: string, 
     isRebaseDue: info.lane === 'NEEDS_REBASE' && (info.waitsFor?.length ?? 0) === 0,
     isLanded: info.isLanded,
     hold: input.holds[info.name] ?? null,
-    comment: comment !== undefined && comment.sha === info.sha ? comment.text : null,
+    comment: comment !== undefined && (comment.sha === info.sha || (comment.isKept && !info.isLanded)) ? comment.text : null,
     worktree: info.worktree,
   }
 
   return { ...branch, summary: summaryOf(branch, facts, base) }
+}
+
+/**
+ * The comments a read leaves: a kept comment ends once its branch is gone
+ * or reads landed, so it does not come back on new work or a new branch of
+ * the same name. A comment on a tip stays, shown while the tip does.
+ *
+ * @param comments the comments by branch
+ * @param snapshot the read
+ * @returns the comments, the same object when none ended
+ */
+export function commentsAfter(
+  comments: Readonly<Record<string, CallerComment>>,
+  snapshot: Snapshot,
+): Readonly<Record<string, CallerComment>> {
+  const branches = new Map(snapshot.branches.map(branch => [branch.name, branch]))
+  const ended = Object.entries(comments).filter(([name, comment]) => {
+    const branch = branches.get(name)
+
+    return comment.isKept && (branch === undefined || branch.isLanded)
+  })
+
+  return ended.length === 0
+    ? comments
+    : Object.fromEntries(Object.entries(comments).filter(([name]) => !ended.some(([gone]) => gone === name)))
 }
 
 /**

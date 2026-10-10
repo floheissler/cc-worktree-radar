@@ -17,7 +17,7 @@ export const TOOL_DESCRIPTION = [
   'It never merges, rebases, tags, pushes or moves a ref.',
   'Actions: open (starts the radar for the session folder and returns the snapshot; `wake` lists events that wake this session with a one-line report, which asks for nothing: ' +
     WAKE_EVENTS.join(', ') +
-    '), snapshot (reads now and returns the facts as JSON), close, hold/unhold (park a branch, with a reason), comment (a short comment shown on the branch row until its tip moves; empty text clears), status (one line under the queue; empty clears).',
+    '), snapshot (reads now and returns the facts as JSON), close, hold/unhold (park a branch, with a reason), comment (a short comment shown on the branch row until its tip moves; with `keep`, until it lands or is gone; empty text clears), status (one line under the queue; empty clears).',
 ].join(' ')
 
 export const TOOL_INPUT_SCHEMA = {
@@ -36,6 +36,10 @@ export const TOOL_INPUT_SCHEMA = {
     branch: { type: 'string', description: 'hold, unhold, comment: the branch.' },
     reason: { type: 'string', description: 'hold: why it is held.' },
     text: { type: 'string', description: "comment: the comment on the branch's current tip; status: the line under the queue. Empty clears." },
+    keep: {
+      type: 'boolean',
+      description: 'comment: true keeps it on the tips that follow, until it is cleared, the branch is gone or it lands.',
+    },
   },
   required: ['action'],
   additionalProperties: false,
@@ -49,7 +53,7 @@ export type ToolRequest =
   | { readonly action: 'close' | 'snapshot' }
   | { readonly action: 'hold'; readonly branch: string; readonly reason: string }
   | { readonly action: 'unhold'; readonly branch: string }
-  | { readonly action: 'comment'; readonly branch: string; readonly text: string }
+  | { readonly action: 'comment'; readonly branch: string; readonly text: string; readonly keep: boolean }
   | { readonly action: 'status'; readonly text: string }
 
 function textField(input: Readonly<Record<string, unknown>>, name: string): string | null {
@@ -88,7 +92,7 @@ export function toolRequestOf(input: Readonly<Record<string, unknown>>): ToolReq
         ? { action, branch, reason: textField(input, 'reason') ?? '' }
         : action === 'unhold'
           ? { action, branch }
-          : { action, branch, text: textField(input, 'text') ?? '' }
+          : { action, branch, text: textField(input, 'text') ?? '', keep: input['keep'] === true }
     case 'status':
       return { action, text: textField(input, 'text') ?? '' }
     default:

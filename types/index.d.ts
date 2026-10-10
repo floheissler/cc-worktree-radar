@@ -136,7 +136,7 @@ export type BranchInfo = {
   readonly isLanded: boolean
   readonly hold: Hold | null
   /**
-   * A caller's comment on this tip (the radar tool's `comment`).
+   * A caller's comment (the radar tool's `comment`): on this tip, or kept.
    */
   readonly comment: string | null
   readonly worktree: WorktreeInfo | null
@@ -206,11 +206,17 @@ export type RadarConfig = {
 }
 
 /**
- * A caller's comment, shown while the branch's tip is the one it was set on.
+ * A caller's comment, shown while the branch's tip is the one it was set on;
+ * a kept one on every tip, until it is cleared, the branch is gone or it
+ * lands.
  */
 export type CallerComment = {
+  /**
+   * The tip it was set on.
+   */
   readonly sha: string
   readonly text: string
+  readonly isKept: boolean
 }
 
 declare module 'claude-code' {

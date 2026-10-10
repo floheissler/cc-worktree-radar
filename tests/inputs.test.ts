@@ -33,7 +33,14 @@ describe('the radar tool', () => {
       branch: 'feat/x',
       reason: 'r',
     })
-    expect(toolRequestOf({ action: 'comment', branch: 'feat/x' })).toEqual({ action: 'comment', branch: 'feat/x', text: '' })
+    expect(toolRequestOf({ action: 'comment', branch: 'feat/x' })).toEqual({ action: 'comment', branch: 'feat/x', text: '', keep: false })
+    expect(toolRequestOf({ action: 'comment', branch: 'feat/x', text: 'merge once READY', keep: true })).toEqual({
+      action: 'comment',
+      branch: 'feat/x',
+      text: 'merge once READY',
+      keep: true,
+    })
+    expect(toolRequestOf({ action: 'comment', branch: 'feat/x', keep: 'yes' })).toMatchObject({ keep: false })
     expect(toolRequestOf({ action: 'unhold' })).toEqual({ error: 'unhold needs a branch' })
     expect(toolRequestOf({ action: 'merge' })).toHaveProperty('error')
   })

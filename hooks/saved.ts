@@ -52,7 +52,7 @@ function commentsIn(value: unknown): Record<string, CallerComment> {
     const fields = fieldsOf(comment)
 
     if (fields !== null && typeof fields['sha'] === 'string' && typeof fields['text'] === 'string' && fields['text'] !== '') {
-      comments[branch] = { sha: fields['sha'], text: clipChars(fields['text'], Limits.COMMENT_CHARS) }
+      comments[branch] = { sha: fields['sha'], text: clipChars(fields['text'], Limits.COMMENT_CHARS), isKept: fields['isKept'] === true }
     }
   }
 

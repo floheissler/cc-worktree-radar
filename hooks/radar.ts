@@ -2,7 +2,7 @@ import type { Timer } from 'claude-code'
 
 import type { Hold, RadarConfig } from '../types'
 
-import { readSnapshot } from './analysis'
+import { commentsAfter, readSnapshot } from './analysis'
 import { dueMarksOf, eventsOf, wakeTextOf, type RadarEvent } from './changes'
 import { gitOf, type Git } from './git'
 import type { Host } from './host'
@@ -96,11 +96,12 @@ export type Radar = {
    */
   readonly setHold: (host: Host, root: string, branch: string, reason: string | null) => Promise<string | null>
   /**
-   * Comments on a branch's current tip, or clears the comment with an empty text.
+   * Comments on a branch's current tip, or on every tip until it lands
+   * (`isKept`); clears the comment with an empty text.
    *
    * @returns null, or why not
    */
-  readonly setComment: (host: Host, root: string, branch: string, text: string) => Promise<string | null>
+  readonly setComment: (host: Host, root: string, branch: string, text: string, isKept: boolean) => Promise<string | null>
 }
 
 /**
@@ -306,6 +307,7 @@ export function createRadar(): Radar {
     await host.state.snapshot.set(() => result.snapshot)
     await host.state.problem.set(() => null)
     await host.state.dueMarks.set(marks => dueMarksOf(marks, result.snapshot))
+    await host.state.comments.set(comments => commentsAfter(comments, result.snapshot))
     await announce(host, radar, eventsOf(before, result.snapshot))
   }
 
@@ -433,7 +435,7 @@ export function createRadar(): Radar {
 
       return null
     },
-    setComment: async (host, root, branch, text) => {
+    setComment: async (host, root, branch, text, isKept) => {
       const tip = await gitOf(host.run, root)(['rev-parse', '--verify', '--quiet', `refs/heads/${branch}`])
 
       if (tip === null) {
@@ -449,7 +451,7 @@ export function createRadar(): Radar {
         if (kept === '') {
           delete next[branch]
         } else {
-          next[branch] = { sha, text: kept }
+          next[branch] = { sha, text: kept, isKept }
         }
 
         return next

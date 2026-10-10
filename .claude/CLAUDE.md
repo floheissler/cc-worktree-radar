@@ -216,10 +216,16 @@ the module otherwise:
   and what comes next. A ready row's detail says only what else there is (a
   stack on it, a rebase it forces): "merges cleanly" is what ready means; a
   cleanup row's says `has a worktree`, its path being the snapshot's.
-  COMMENT (`commentOf`) is a caller's, set through the tool's `comment`:
-  Claude's words, as only a model calls the tool, so marked with the `✻`
-  Claude Code draws its own lines with, in `claude`, and quoted in italics
-  in `inactive` (light grey on a dark theme), cut inside its quotes. With a
+  COMMENT (`commentOf`) is a caller's, set through the tool's `comment`,
+  on the branch's tip (`CallerComment.sha`), or kept (`keep: true`,
+  `isKept`) on every tip until the branch lands or is gone, when a read
+  ends it (`commentsAfter`), so it does not come back on new work or a new
+  branch of that name. Kept comments came from the D3 dogfood: "merge once
+  READY", set on a branch with no commits yet, went with its first commit.
+  A comment is Claude's words, as only a model calls the tool, so marked
+  with the `✻` Claude Code draws its own lines with, in `claude`, and
+  quoted in italics in `inactive` (light grey on a dark theme), cut inside
+  its quotes. With a
   comment shown, DETAIL is as wide as its longest, up to `DETAIL_SHARE` of
   what the branch leaves, and COMMENT takes the rest, from
   `COMMENT_MIN_CELLS`. COMMENT reaches the row's end, under the header's

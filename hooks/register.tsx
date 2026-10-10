@@ -476,7 +476,7 @@ export const register: Register = (on, pluginOptions) => {
         return answerOf(host)
       }
       case 'comment': {
-        const why = await radar.setComment(host, root, request.branch, request.text)
+        const why = await radar.setComment(host, root, request.branch, request.text, request.keep)
 
         if (why !== null) {
           return { deny: why }

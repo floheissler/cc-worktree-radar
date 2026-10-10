@@ -2,7 +2,7 @@ import { describe, expect, test } from 'claude-code/testing'
 
 import type { Snapshot } from '../types'
 
-import { readSnapshot, type ReadInput } from '../hooks/analysis'
+import { commentsAfter, readSnapshot, type ReadInput } from '../hooks/analysis'
 import { gitOf } from '../hooks/git'
 import { EXPECTED, HOLDS, NEXT, RUNS } from './fixtures/repo'
 import { replayOf } from './replay'
@@ -206,13 +206,31 @@ describe('reading a repository', () => {
     const first = await snapshotOf(inputOf(replayOf().run))
     const ready = first.branches.find(branch => branch.name === 'feat/ready-a')
     const comments = {
-      'feat/ready-a': { sha: ready?.sha ?? '', text: 'handed back to b-7c' },
-      'feat/big': { sha: 'an-old-tip', text: 'stale' },
+      'feat/ready-a': { sha: ready?.sha ?? '', text: 'handed back to b-7c', isKept: false },
+      'feat/big': { sha: 'an-old-tip', text: 'stale', isKept: false },
     }
     const second = await snapshotOf(inputOf(replayOf().run, { comments }))
 
     expect(second.branches.find(branch => branch.name === 'feat/ready-a')?.comment).toBe('handed back to b-7c')
     expect(second.branches.find(branch => branch.name === 'feat/big')?.comment).toBeNull()
+  })
+
+  test('shows a kept comment on every tip until the branch lands or is gone', async () => {
+    // Seen live: "merge once READY", set before the first commit, went with it
+    const comments = {
+      'feat/big': { sha: 'an-old-tip', text: 'merge once READY', isKept: true },
+      'feat/landed': { sha: 'an-old-tip', text: 'merge once READY', isKept: true },
+      'feat/gone': { sha: 'an-old-tip', text: 'merge once READY', isKept: true },
+      'feat/wip': { sha: 'an-old-tip', text: 'stale', isKept: false },
+    }
+    const snapshot = await snapshotOf(inputOf(replayOf().run, { comments }))
+    const commentOf = (name: string) => snapshot.branches.find(branch => branch.name === name)?.comment
+
+    expect([commentOf('feat/big'), commentOf('feat/landed'), commentOf('feat/wip')]).toEqual(['merge once READY', null, null])
+    // The read ends the kept comments of a branch landed or gone, and only
+    // those
+    expect(Object.keys(commentsAfter(comments, snapshot))).toEqual(['feat/big', 'feat/wip'])
+    expect(commentsAfter({ 'feat/big': comments['feat/big'] }, snapshot)).toEqual({ 'feat/big': comments['feat/big'] })
   })
 
   test('marks a branch due a rebase once nothing ahead of it conflicts', async () => {

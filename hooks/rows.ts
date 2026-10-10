@@ -1053,7 +1053,7 @@ export function helpLinesOf(base: string, columns: number): Line[] {
         {
           mark: COMMENT_MARK,
           term: { text: '“handed back”', color: 'inactive', italic: true },
-          meaning: 'a comment: words Claude left on the branch through the radar\'s tool, shown until the branch moves. The details beside it are the radar\'s own',
+          meaning: 'a comment: words Claude left on the branch through the radar\'s tool, shown until the branch moves, or, kept, until it lands. The details beside it are the radar\'s own',
         },
       ],
     },

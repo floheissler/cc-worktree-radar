@@ -388,6 +388,34 @@ describe('the radar tool', () => {
     expect(texts.some(text => /land next → feat\/parent +release v0\.4\.1 pending$/.test(text))).toBe(true)
   })
 
+  test('keeps a comment the caller asks to keep, until the branch lands', async ($, on) => {
+    const { clock, store } = worldOf(on)
+    const opened = $.tool.call({ tool: TOOL, action: 'open' } as never)
+
+    await settled(clock)
+    await opened
+
+    for (const branch of ['feat/conflict', 'feat/landed']) {
+      const commented = $.tool.call({ tool: TOOL, action: 'comment', branch, text: 'merge once READY', keep: true } as never)
+
+      await settled(clock)
+      await commented
+    }
+
+    const answer = $.tool.call({ tool: TOOL, action: 'snapshot' } as never)
+
+    await settled(clock)
+
+    const branches = (JSON.parse(String((await answer).result)) as { branches: { name: string; comment: string | null }[] }).branches
+    const commentOf = (name: string) => branches.find(branch => branch.name === name)?.comment
+
+    expect([commentOf('feat/conflict'), commentOf('feat/landed')]).toEqual(['merge once READY', null])
+    expect((store.get(`resume:${SESSION}`) as { comments: Record<string, unknown> }).comments['feat/conflict']).toMatchObject({
+      text: 'merge once READY',
+      isKept: true,
+    })
+  })
+
   test('refuses what it cannot do', async ($, on) => {
     const { clock } = worldOf(on)
     const snapshot = await $.tool.call({ tool: TOOL, action: 'snapshot' } as never)

@@ -13,7 +13,7 @@ describe('a saved radar', () => {
       radar: { root: '/work', base: 'develop', wake: ['ready', 'rebase-due'] },
       compact: true,
       status: 'release v0.4.1 pending',
-      comments: { 'feat/a': { sha: 'abc', text: 'handed back to b-7c' } },
+      comments: { 'feat/a': { sha: 'abc', text: 'handed back to b-7c', isKept: false }, 'feat/d': { sha: 'd', text: 'merge once READY', isKept: true } },
       dueMarks: { 'feat/b': 'def' },
       savedAt: 1_800_000_000_000,
     }
@@ -27,14 +27,14 @@ describe('a saved radar', () => {
         radar: { root: '/work', base: '', wake: ['ready', 'bogus', 7] },
         compact: 'yes',
         status: 42,
-        comments: { 'feat/a': { sha: 'abc' }, 'feat/b': 'text', 'feat/c': { sha: 'c', text: 'x'.repeat(500) } },
+        comments: { 'feat/a': { sha: 'abc' }, 'feat/b': 'text', 'feat/c': { sha: 'c', text: 'x'.repeat(500), isKept: 'yes' } },
         dueMarks: { 'feat/a': 'abc', 'feat/b': 1 },
       }),
     ).toEqual({
       radar: { root: '/work', base: null, wake: ['ready'] },
       compact: false,
       status: null,
-      comments: { 'feat/c': { sha: 'c', text: `${'x'.repeat(Limits.COMMENT_CHARS - 1)}…` } },
+      comments: { 'feat/c': { sha: 'c', text: `${'x'.repeat(Limits.COMMENT_CHARS - 1)}…`, isKept: false } },
       dueMarks: { 'feat/a': 'abc' },
       savedAt: 0,
     })

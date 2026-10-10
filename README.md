@@ -50,7 +50,8 @@ it has ahead and the age of the last one. DETAIL is what the radar reads
 about it: why it is in its lane and what comes next (`conflicts: cart.ts`,
 `rebase after #2 fix/totals`, `lands after #1 feat/x`, who works there).
 COMMENT is what a skill or agent left on the branch through the radar's
-tool: Claude's words, marked `✻` and quoted, shown until the branch moves.
+tool: Claude's words, marked `✻` and quoted, shown until the branch moves,
+or, kept, until it lands.
 The column shows while a row has a comment, on a band wide enough for it.
 
 When Claude Code gives the band fewer rows than there are branches, lanes
@@ -130,7 +131,7 @@ your own can open the radar and act on what it sees. Allow it in the skill's
 | `snapshot` | | Reads now and answers the snapshot |
 | `close` | | Closes the radar |
 | `hold`, `unhold` | `branch`, `reason?` | Parks a branch, or lets it go |
-| `comment` | `branch`, `text` | A short comment on the branch's row, shown until its tip moves; empty text clears it |
+| `comment` | `branch`, `text`, `keep?` | A short comment on the branch's row, shown until its tip moves; with `keep: true`, on every tip until the branch lands or is gone (`merge once ready`, set before the first commit). Empty text clears it |
 | `status` | `text` | One line under the queue (`release v0.4.1 pending`); empty text clears it |
 
 `wake` lists the events that wake the session with a one-line prompt:
