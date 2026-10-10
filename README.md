@@ -178,8 +178,9 @@ In `/config`, under the plugin:
 Everything stays on your machine. The radar runs `git` in your repository
 (reads, plus the in-memory merges of `git merge-tree` and `git commit-tree`,
 whose unreferenced objects `git gc` prunes; no ref, index or worktree is
-touched) and `claude agents --json` to see which sessions work where; a
-subagent's worktree it knows by the lock Claude Code puts on it. It
+touched) and `claude agents --json` to see which sessions work where;
+the lock Claude Code puts on a worktree tells it which session or subagent
+works there. It
 sends nothing anywhere. Holds, and the radar each session left open, are kept
 in Claude Code's plugin store on this machine.
 

@@ -175,6 +175,33 @@ describe('reading a repository', () => {
     }
   })
 
+  test('a session listed where it started is found in the worktree locked for its process', async () => {
+    // Seen live: a background job moved into its new worktree, while
+    // `claude agents` still listed it in the main one; its lock named its pid
+    const key = JSON.stringify(['/work', 'worktree', 'list', '--porcelain'])
+    const listed = RUNS[key] as { code: number; stdout: string }
+    const locked = {
+      ...RUNS,
+      [key]: {
+        ...listed,
+        stdout: listed.stdout.replace(
+          'branch refs/heads/feat/landed\n',
+          'branch refs/heads/feat/landed\nlocked claude session landed (pid 7 start 3)\n',
+        ),
+      },
+    }
+    const worker = [{ id: 'w', name: 'worker', status: 'busy', kind: 'session' as const, cwd: '/work', pid: 7 }]
+    const landedOf = async (runs: typeof RUNS) =>
+      (await snapshotOf(inputOf(replayOf(runs).run, { sessions: worker }))).branches.find(branch => branch.name === 'feat/landed')
+
+    expect(await landedOf(locked)).toMatchObject({
+      lane: 'IN_PROGRESS',
+      summary: 'landed in main, new work under way · session worker busy',
+    })
+    // By its folder alone, it works in the main worktree
+    expect(await landedOf(RUNS)).toMatchObject({ lane: 'CLEANUP', worktree: { sessions: [] } })
+  })
+
   test('shows a caller comment only on the tip it was set on', async () => {
     const first = await snapshotOf(inputOf(replayOf().run))
     const ready = first.branches.find(branch => branch.name === 'feat/ready-a')

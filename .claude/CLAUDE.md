@@ -126,7 +126,14 @@ the module otherwise:
   cause, not proven: on 2.1.296 (instrumented, twice) the lock went with
   the agent's last state, which the poll caught anyway.
 - A worktree's `sessions` holds who works there: the sessions
-  `claude agents` lists by folder, and subagents (`kind: 'agent'`). A
+  `claude agents` lists, and subagents (`kind: 'agent'`). A session belongs
+  to the worktree whose `claude session` lock names its pid, else to the
+  deepest one holding its folder (`sessionsByWorktree`). The lock comes
+  first because the CLI can list a session in the folder it started from
+  after it moved into a worktree: seen live in the D3 dogfood, a background
+  job's new worktree read CLEANUP and woke `cleanup` while its worker was
+  in it. Claude Code unlocks a worktree a session leaves and keeps, and
+  releases stale locks. A
   subagent runs inside its parent's process, so the CLI lists no session in
   its worktree; the radar knows it by the worktree's lock
   (`agentsByWorktree`): an agent of the radar's own session while
@@ -320,8 +327,10 @@ subagents (`isolation: "worktree"`) watched through the radar.
   `claude agent agent-<id> (pid <n> start <n>)`: the pid of the parent
   session's process, and its start time (`/proc/<pid>/stat`, field 22).
   `claude -w` locks its worktrees the same way: `claude session <name> (pid
-  …)`. The lock is gone once the agent finished; a worktree it left
-  unchanged is removed with its branch.
+  …)`, as do a background job and EnterWorktree. The lock is gone once the
+  agent finished; a worktree it left unchanged is removed with its branch.
+  Where Claude Code cannot read the start time it writes `(pid <n>)` alone;
+  `claudeLockOf` takes both.
 - `claude agents --json` lists the parent session (its `pid` is the lock's)
   and no session in the agent's worktree, so by the CLI alone an agent at
   work read CLEANUP, then IN_PROGRESS only once it had uncommitted files.

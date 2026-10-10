@@ -285,10 +285,7 @@ async function read(input: ReadInput): Promise<ReadResult> {
   const baseHead = allHeads.get(base) as Head
   const baseSha = baseHead.sha
   const main = trees[0]?.path ?? place.top
-  const attached = sessionsByWorktree(
-    trees.map(tree => tree.path),
-    input.sessions ?? [],
-  )
+  const attached = sessionsByWorktree(trees, input.sessions ?? [])
 
   for (const [path, agents] of agentsByWorktree(trees, input.sessions, input.agents)) {
     attached.set(path, [...(attached.get(path) ?? []), ...agents])

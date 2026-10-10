@@ -40,9 +40,11 @@ export type AgentRow = {
 
 /**
  * A worktree lock Claude Code took: `claude agent agent-<id> (pid <n> start
- * <n>)` on a subagent's worktree, `claude session <name> (pid …)` on one
- * `claude -w` made. The pid is the session's process, the agent's parent's
- * for an agent.
+ * <n>)` on a subagent's worktree, `claude session <name> (pid …)` on one a
+ * session works in (`claude -w`, a background job, EnterWorktree). The pid
+ * is the session's process, the agent's parent's for an agent. The `start`
+ * part is the process's start time, which Claude Code leaves out where it
+ * cannot read it: `(pid <n>)`.
  */
 export type ClaudeLock = {
   readonly kind: 'agent' | 'session'
@@ -50,7 +52,7 @@ export type ClaudeLock = {
   readonly pid: number
 }
 
-const CLAUDE_LOCK = /^claude (agent|session) (\S+) \(pid (\d+) start \d+\)$/
+const CLAUDE_LOCK = /^claude (agent|session) (\S+) \(pid (\d+)(?: start .+)?\)$/
 
 /**
  * Reads a worktree's lock reason as Claude Code's, if it is one.
@@ -130,30 +132,42 @@ export function folderKeyOf(path: string): string {
 }
 
 /**
- * Attaches each session to the deepest worktree holding its folder: linked
- * worktrees often live inside the main one (`.claude/worktrees/<name>`).
+ * Attaches each session to the worktree it works in: the one Claude Code
+ * locked for its process, else the deepest one holding its folder (linked
+ * worktrees often live inside the main one, `.claude/worktrees/<name>`).
+ * The lock comes first because `claude agents` can list a session in the
+ * folder it started from after it moved into a worktree (seen live: a
+ * background job listed in the main worktree, its own worktree's lock
+ * naming its pid). Claude Code drops the lock when a session leaves a
+ * worktree it keeps, and releases stale ones.
  *
- * @param worktreePaths the worktrees' folders
+ * @param worktrees the worktrees, with their locks
  * @param sessions the sessions
  * @returns the sessions of each worktree, by the worktree's folder as given
  */
 export function sessionsByWorktree(
-  worktreePaths: readonly string[],
+  worktrees: readonly { readonly path: string; readonly lock: string | null }[],
   sessions: readonly SessionRow[],
 ): Map<string, SessionInfo[]> {
-  const byDepth = [...worktreePaths].sort((a, b) => folderKeyOf(b).length - folderKeyOf(a).length)
-  const attached = new Map<string, SessionInfo[]>(worktreePaths.map(path => [path, []]))
+  const byDepth = [...worktrees].sort((a, b) => folderKeyOf(b.path).length - folderKeyOf(a.path).length)
+  const attached = new Map<string, SessionInfo[]>(worktrees.map(tree => [tree.path, []]))
 
   for (const session of sessions) {
     const cwd = folderKeyOf(session.cwd)
-    const home = byDepth.find(path => {
+    const holds = (path: string): boolean => {
       const root = folderKeyOf(path)
 
       return cwd === root || cwd.startsWith(`${root}/`)
+    }
+    const locked = byDepth.filter(tree => {
+      const lock = claudeLockOf(tree.lock)
+
+      return lock?.kind === 'session' && session.pid !== null && lock.pid === session.pid
     })
+    const home = locked.find(tree => holds(tree.path)) ?? locked[0] ?? byDepth.find(tree => holds(tree.path))
 
     if (home !== undefined) {
-      attached.get(home)?.push({ id: session.id, name: session.name, status: session.status, kind: 'session' })
+      attached.get(home.path)?.push({ id: session.id, name: session.name, status: session.status, kind: 'session' })
     }
   }
 

@@ -451,6 +451,29 @@ describe('wake-ups and notifications', () => {
     expect(prompts).toEqual([`worktree-radar: agent agent-abc on feat/landed finished. ${WAKE_NOTE}`])
   })
 
+  test('a session the CLI lists where it started is still at work in its locked worktree', async ($, on) => {
+    // Seen live: a false cleanup wake for a worktree its worker had just
+    // moved into, `claude agents` listing the worker in the main worktree
+    const worker = (cwd: string) =>
+      JSON.stringify([{ pid: 4_200, sessionId: 'session-w', name: 'landed-worker', cwd, kind: 'background', status: 'busy' }])
+    const runs = {
+      current: landedLocked(RUNS, 'claude session landed (pid 4200 start 9)'),
+      sessions: worker('/work/.claude/worktrees/landed'),
+    }
+    const { clock, prompts } = worldOf(on, runs)
+    const opened = $.tool.call({ tool: TOOL, action: 'open', wake: ['cleanup'] } as never)
+
+    await settled(clock)
+    await opened
+
+    runs.sessions = worker('/work')
+    await nextRead(clock)
+    await nextRead(clock)
+
+    expect((await bandText($)).some(text => /feat\/landed\s+in progress/.test(text))).toBe(true)
+    expect(prompts).toEqual([])
+  })
+
   test('a wake the session has not taken yet holds up neither the radar nor its own tool', async ($, on) => {
     const runs = { current: blockReady(RUNS), sessions: sessionsOf(['landed-worker', 'landed', 'busy']) }
     const { clock, prompts, turn } = worldOf(on, runs)
@@ -791,6 +814,16 @@ function ownAgent(status: 'running' | 'completed') {
  * Code locks the worktree of an agent it isolates in one.
  */
 function agentLocked(runs: Recorded): Recorded {
+  return landedLocked(runs, 'claude agent agent-abc (pid 42 start 7)')
+}
+
+/**
+ * The recording with feat/landed's worktree locked.
+ *
+ * @param runs the recording
+ * @param reason the lock's reason
+ */
+function landedLocked(runs: Recorded, reason: string): Recorded {
   const key = JSON.stringify(['/work', 'worktree', 'list', '--porcelain'])
   const list = runs[key]
 
@@ -802,7 +835,7 @@ function agentLocked(runs: Recorded): Recorded {
     ...runs,
     [key]: {
       ...list,
-      stdout: list.stdout.replace('branch refs/heads/feat/landed\n', 'branch refs/heads/feat/landed\nlocked claude agent agent-abc (pid 42 start 7)\n'),
+      stdout: list.stdout.replace('branch refs/heads/feat/landed\n', `branch refs/heads/feat/landed\nlocked ${reason}\n`),
     },
   }
 }

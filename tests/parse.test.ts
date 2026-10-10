@@ -97,6 +97,8 @@ describe('worktree locks', () => {
   test('knows Claude Code\'s own locks from any other', () => {
     expect(claudeLockOf('claude agent agent-abc (pid 42 start 7)')).toEqual({ kind: 'agent', name: 'agent-abc', pid: 42 })
     expect(claudeLockOf('claude session mock-a (pid 9 start 1)')).toEqual({ kind: 'session', name: 'mock-a', pid: 9 })
+    // Without the start time, where Claude Code cannot read it
+    expect(claudeLockOf('claude session mock-a (pid 9)')).toEqual({ kind: 'session', name: 'mock-a', pid: 9 })
 
     for (const other of ['', 'on a USB stick', 'claude agent agent-abc', null]) {
       expect(claudeLockOf(other)).toBeNull()
@@ -144,10 +146,40 @@ describe('sessions', () => {
   })
 
   test('attaches each session to the deepest worktree holding its folder', () => {
-    const attached = sessionsByWorktree(['/work', '/work/.claude/worktrees/x'], parseSessions(listed) ?? [])
+    const attached = sessionsByWorktree(
+      [
+        { path: '/work', lock: null },
+        { path: '/work/.claude/worktrees/x', lock: null },
+      ],
+      parseSessions(listed) ?? [],
+    )
 
     expect(attached.get('/work/.claude/worktrees/x')?.map(session => session.name)).toEqual(['x-worker'])
     expect(attached.get('/work')?.map(session => session.name)).toEqual(['coordinator'])
+  })
+
+  test('attaches a session to the worktree locked for its process, wherever the CLI places it', () => {
+    // Seen live: a background job that moved into a worktree, listed in the
+    // folder it started from
+    const trees = [
+      { path: '/work', lock: null },
+      { path: '/work/.claude/worktrees/x', lock: null },
+      { path: '/work/.claude/worktrees/y', lock: 'claude session y (pid 2 start 5)' },
+      { path: '/work/.claude/worktrees/z', lock: 'claude session z (pid 99)' },
+    ]
+    const attached = sessionsByWorktree(trees, parseSessions(listed) ?? [])
+
+    expect(attached.get('/work/.claude/worktrees/y')?.map(session => session.name)).toEqual(['coordinator'])
+    expect(attached.get('/work')).toEqual([])
+    // A lock names no session whose process is not listed
+    expect(attached.get('/work/.claude/worktrees/z')).toEqual([])
+    // An agent's lock is not the session's own
+    const agent = sessionsByWorktree(
+      [{ path: '/work', lock: null }, { path: '/w/a', lock: 'claude agent agent-1 (pid 2 start 5)' }],
+      parseSessions(listed) ?? [],
+    )
+
+    expect(agent.get('/work')?.map(session => session.name)).toEqual(['x-worker', 'coordinator'])
   })
 
   test('compares Windows folders by drive and separators, not by spelling', () => {
@@ -155,7 +187,7 @@ describe('sessions', () => {
     expect(folderKeyOf('/Work/Repo/')).toBe('/Work/Repo')
 
     const attached = sessionsByWorktree(
-      ['C:/Users/Flo/repo'],
+      [{ path: 'C:/Users/Flo/repo', lock: null }],
       [{ id: 'a', name: 'w', status: 'busy', kind: 'session', cwd: 'c:\\users\\flo\\repo\\src', pid: 1 }],
     )
 
