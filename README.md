@@ -19,8 +19,6 @@ and the order to land them in.
 
 It only looks. It never merges, rebases, tags, pushes or moves a ref.
 
-Status: in development, not released yet.
-
 ## Requirements
 
 - Claude Code with mods (2.1.295 or later).
@@ -45,14 +43,14 @@ Answer `y` to add the marketplace, then pick a scope.
 | `/radar unhold <branch>` | Lets it go again |
 | `/radar off` | Closes the radar |
 
-Each row is a branch: its place in the landing order, its lane, the commits
-it has ahead and the age of the last one. DETAIL is what the radar reads
-about it: why it is in its lane and what comes next (`conflicts: cart.ts`,
-`rebase after #2 fix/totals`, `lands after #1 feat/x`, who works there).
-COMMENT is what a skill or agent left on the branch through the radar's
-tool: Claude's words, marked `✻` and quoted, shown until the branch moves,
-or, kept, until it lands.
-The column shows while a row has a comment, on a band wide enough for it.
+Each row is a branch: its place in the landing order, its lane, the commits it
+has ahead and the age of the last one. DETAIL is what the radar reads about
+it: why it is in its lane and what comes next (`conflicts: cart.ts`, `rebase
+after #2 fix/totals`, `lands after #1 feat/x`, who works there). COMMENT is
+what a skill or agent left on the branch through the radar's tool: Claude's
+words, marked `✻` and quoted, shown until the branch moves, or, kept, until it
+lands. The column shows while a row has a comment, on a band wide enough for
+it.
 
 When Claude Code gives the band fewer rows than there are branches, lanes
 fold into one line each (`needs rebase (3): feat/a, feat/b, feat/c`):
@@ -79,12 +77,13 @@ title, the repository and the counts; `land next` stays to the end. Compact, the
 panel goes and the status line stays alone above the prompt, the controls
 at its end where the messages were; only a failed read still shows.
 
-Click the controls, or give the band the keyboard (Ctrl+X Tab, or a click) and press
-the letter. On a band narrower than 90 columns the labels shorten to
-`h: ?`, `c: -` and `x: ×`. The `[-]` beside the band is Claude Code's own: it
-hides the band (Ctrl+X Ctrl+A), and a mod cannot move it into the frame. It updates by itself while open: every few seconds the radar checks the
-branch tips, the worktrees, the holds, the running Claude sessions and its
-own subagents, and reads the repository again once a change has settled.
+Click the controls, or give the band the keyboard (Ctrl+X Tab, or a click) and
+press the letter. On a band narrower than 90 columns the labels shorten to `h:
+?`, `c: -` and `x: ×`. The `[-]` beside the band is Claude Code's own: it
+hides the band (Ctrl+X Ctrl+A), and a mod cannot move it into the frame. It
+updates by itself while open: every few seconds the radar checks the branch
+tips, the worktrees, the holds, the running Claude sessions and its own
+subagents, and reads the repository again once a change has settled.
 
 ### Across sessions
 
@@ -135,13 +134,12 @@ your own can open the radar and act on what it sees.
 | `comment` | `branch`, `text`, `keep?` | A short comment on the branch's row, shown until its tip moves; with `keep: true`, on every tip until the branch lands or is gone (`merge once ready`, set before the first commit). Empty text clears it |
 | `status` | `text` | One line under the queue (`release v0.4.1 pending`); empty text clears it |
 
-`wake` lists the events that wake the session with a one-line prompt:
-`ready`, `conflict`, `rebase-due`, `stacked`, `cleanup`, `base-moved`,
-`session-idle` (a session or agent going idle, or a subagent finishing).
-Each event wakes once per branch tip. While the session is at work, a wake waits for
-its turn to end, and what the radar finds meanwhile comes in one more wake
-after it. `/radar` itself wakes nothing. The prompt is a
-report and says so:
+`wake` lists the events that wake the session with a one-line prompt: `ready`,
+`conflict`, `rebase-due`, `stacked`, `cleanup`, `base-moved`, `session-idle`
+(a session or agent going idle, or a subagent finishing). Each event wakes
+once per branch tip. While the session is at work, a wake waits for its turn
+to end, and what the radar finds meanwhile comes in one more wake after it.
+`/radar` itself wakes nothing. The prompt is a report and says so:
 
 ```
 worktree-radar: feat/a is ready to land (#1) · main moved 3f2a1c9→8b0e4d2. This is a report from a read-only view, not a request: act on it only as your user or your instructions say.
@@ -160,13 +158,13 @@ listed, `next`, and per branch: `name`, `sha`, `lane`, `rank`, `ahead`,
 `conflicts`, `stackedOn`, `dependents`, `sharesWith`, `breaks` (branches that
 would conflict once it landed), `rebaseCost`, `waitsFor`, `isRebaseDue`,
 `isLanded` (nothing left to land, and its work reached the base: through a
-merge, or, as the branch's own reflog shows, a fast-forward),
-`hold`, `comment`, `worktree` (path, uncommitted files, rebase under way,
-`isBeingRemoved`, sessions) and a one-line `summary`. A worktree's `sessions` lists who works
-there: Claude sessions (`kind: "session"`: `id`, `name`, `status`) and
-subagents (`kind: "agent"`: the agent's `id`, which SendMessage addresses,
-`name`, `status`, `description` of its task where the radar's own session
-spawned it, and `parent`, the session it runs in).
+merge, or, as the branch's own reflog shows, a fast-forward), `hold`,
+`comment`, `worktree` (path, uncommitted files, rebase under way,
+`isBeingRemoved`, sessions) and a one-line `summary`. A worktree's `sessions`
+lists who works there: Claude sessions (`kind: "session"`: `id`, `name`,
+`status`) and subagents (`kind: "agent"`: the agent's `id`, which SendMessage
+addresses, `name`, `status`, `description` of its task where the radar's own
+session spawned it, and `parent`, the session it runs in).
 
 ## Settings
 
@@ -181,22 +179,114 @@ In `/config`, under the plugin:
 Everything stays on your machine. The radar runs `git` in your repository
 (reads, plus the in-memory merges of `git merge-tree` and `git commit-tree`,
 whose unreferenced objects `git gc` prunes; no ref, index or worktree is
-touched) and `claude agents --json` to see which sessions work where;
-the lock Claude Code puts on a worktree tells it which session or subagent
-works there. It
-sends nothing anywhere. Holds, and the radar each session left open, are kept
-in Claude Code's plugin store on this machine.
+touched) and `claude agents --json` to see which sessions work where; the lock
+Claude Code puts on a worktree tells it which session or subagent works there.
+It sends nothing anywhere. Holds, and the radar each session left open, are
+kept in Claude Code's plugin store on this machine.
+
+## Platforms
+
+| Platform | Status |
+| --- | --- |
+| Linux, WSL2 | Tested with Claude Code 2.1.295 and 2.1.296, git 2.53 |
+| Windows | Not tested yet. Windows paths (`C:\…`, either slash) are covered by tests; whether `claude agents` starts without a shell there is open: if not, the band says `sessions unknown` |
+| macOS | Not tested. Paths are POSIX, as on Linux |
+| Desktop app (Code tab) | The band draws there in the tests, mounted on that surface; not looked at live yet |
+
+## Known limits
+
+- It reads; it never merges, rebases, deletes a branch or removes a
+  worktree. Your skill, Claude or you do that.
+- A branch landed by a squash merge still shows its commits as left to
+  land: the base holds a rewritten copy of them.
+- Without a reflog for a branch (none kept, or expired), a branch that
+  landed by a fast-forward reads as never having had work: `nothing beyond
+  main` rather than `landed in main`.
+- Uncommitted changes are not polled: a `git status` per worktree is too
+  slow for that on some file systems (about a second each under WSL's
+  `/mnt/c`). They show at the next read, which follows any other change,
+  and at least once a minute.
+- Which session works where comes from `claude agents --json`, so the
+  `claude` command must be on the `PATH`; otherwise the band says
+  `sessions unknown`. A subagent shows in a worktree Claude Code locked for
+  it (an Agent call with `isolation: "worktree"`).
+- Holds live in Claude Code's plugin store on this machine: every session of
+  the repository here sees them; another machine does not.
+- `claude --resume <id> --fork-session` comes back with the radar closed:
+  Claude Code does not tell a mod which session the fork came from.
+- With the theme set to `auto` or a custom theme, the base's orange is a
+  middle shade that reads on light and dark: a mod cannot learn which
+  background `auto` chose.
+
+## How it works
+
+`hooks/register.tsx` is the hooks module; the rest of `hooks/` is its parts.
+
+| Event | What the hook does |
+| --- | --- |
+| `session.start` | Registers `/radar` and the radar tool; in a resumed session, opens the radar it left open |
+| `command.run` of `radar` | Opens or closes the radar, opens it on its help, holds or lets go of a branch |
+| `tool.call` of `mcp__worktree-radar__radar` | Answers the tool's actions: `open`, `snapshot`, `close`, `hold`, `unhold`, `comment`, `status` |
+| `ui.render` of `AbovePrompt` | Draws the band from the latest read, fitted to the room Claude Code gives it |
+| `session.end` | Saves an open radar for the session's resume |
+| `classic.SessionStart` after `/clear`, `/resume`, `/branch` | Carries the radar over, or brings back the one the resumed session left |
+| `config.set` of `theme` | Picks the base's color for the new theme |
+
+While the radar is open, a poll every few seconds reads the branch tips
+(`git for-each-ref`), the worktrees (`git worktree list --porcelain`), the
+holds, the session's own subagents and, every other poll, `claude agents
+--json`. Once a change has settled, a read follows: per branch `git
+rev-list`, `git diff --numstat` and `git merge-tree --write-tree` against
+the base, `git status` in its worktree, and for branches that touch the
+same files a simulated merge (`git commit-tree`) to find the conflicts one
+landing would cause another. Every git run has `GIT_OPTIONAL_LOCKS=0`, so it
+never takes a lock a commit beside it needs, the C locale, and a timeout.
+The simulated merges leave unreferenced objects that `git gc` prunes; no
+ref, index or worktree is touched.
+
+What the band shows lives in the session's `$.state`; holds (`holds:` and
+the repository's `.git` folder) and the radar each session left open
+(`resume:` and the session's id, the last 50) live in Claude Code's plugin
+store (`~/.claude/plugins/store/`). `claude plugin validate .` lists every
+call the module makes.
 
 ## Develop
 
+Install the working copy once, from the checkout as a local marketplace. A
+local marketplace whose entry is a relative path is read in place, so every
+session runs your working copy:
+
 ```sh
-claude plugin validate --strict .
-claude plugin test .
-tsc -p .
+claude plugin marketplace add /path/to/cc-worktree-radar
+claude plugin install worktree-radar@cc-worktree-radar
 ```
 
-`tsc` needs `.claude-plugin/types/`, which Claude Code writes when a session
-loads the mod with `claude --plugin-dir .`.
+After an edit, run `/reload-plugins` in a session to load it. For a session
+that hot-reloads on every save instead, start it with
+`claude --plugin-dir /path/to/cc-worktree-radar`; that needs file watching,
+which a WSL checkout under `/mnt/c` does not reliably get.
+
+Before each commit:
+
+```sh
+claude plugin validate --strict .   # what the module hooks and calls, and anything the engine would refuse
+claude plugin test .                # the tests under tests/
+tsc -p .                            # type-check against this build's API
+```
+
+`tsc` reads the types Claude Code lays in `.claude-plugin/types/` (ignored by
+git) when it loads the mod with `--plugin-dir`; start one such session after a
+Claude Code update to refresh them.
+
+The version lives in `.claude-plugin/plugin.json` alone; bump it with every
+release, because users only receive a release whose version changed.
+
+## Support
+
+If the radar saves you time, [buy me a few tokens on
+Ko-fi](https://ko-fi.com/floheissler).
+
+[![Buy me a few tokens on Ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/floheissler)
 
 ## License
 
