@@ -142,6 +142,18 @@ the module otherwise:
   its branch IN_PROGRESS like a busy session; one that was at work and is
   gone wakes `session-idle` ("finished"). The row's detail is
   `agent: <task>`, or `agent of <session>`.
+- A worktree on its way out (`isBeingRemoved`): Claude Code removes a
+  closed job's or a finished agent's worktree entry by entry, its `.git`
+  file last, then drops git's record of it, then (not always) deletes the
+  branch (2.1.296). Meanwhile git lists it as
+  before and its status counts every deleted file. In the D3 dogfood that
+  took about a minute on `/mnt/c` (`node_modules`), and a simulation of it
+  read IN_PROGRESS "landed in main, new work under way · 9 uncommitted
+  files". It reads as removal when nobody works there and the status holds
+  tracked files gone (` D`) and nothing else but untracked ones, which a
+  deleted `.gitignore` uncovers (`isDeletionOnly`): the row says `worktree
+  being removed`, and a branch with nothing left to land stays CLEANUP. A
+  branch with commits stays IN_PROGRESS, so files gone never make it READY.
 - The rebase order counts a branch as being rebased when its worktree is
   mid-rebase, or when it was found due a rebase (`dueMarks`) and is in
   progress since. `pipeline.py` used its private hand-back records here.

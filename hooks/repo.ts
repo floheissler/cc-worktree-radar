@@ -302,6 +302,24 @@ export function countStatus(stdout: string): number {
 }
 
 /**
+ * Whether a worktree's status reads as Claude Code deleting it: tracked
+ * files missing (` D`), nothing else but untracked files (`??`), which a
+ * deleted `.gitignore` uncovers. Claude Code removes a worktree (a closed
+ * job's, a finished agent's) entry by entry, its `.git` file last, before
+ * git's record of it goes (2.1.296); on `/mnt/c`, with
+ * `node_modules`, that took about a minute. Nothing is changed, staged or
+ * added: a removal only takes away.
+ *
+ * @param stdout what `git status --porcelain` wrote
+ * @returns whether some tracked file is gone and nothing else changed
+ */
+export function isDeletionOnly(stdout: string): boolean {
+  const lines = stdout.split('\n').filter(line => line.trim() !== '')
+
+  return lines.some(line => line.startsWith(' D ')) && lines.every(line => line.startsWith(' D ') || line.startsWith('?? '))
+}
+
+/**
  * Shows a worktree's path relative to the main worktree when it lies inside
  * it (`.claude/worktrees/feat-x`), else whole.
  *

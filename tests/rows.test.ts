@@ -409,6 +409,23 @@ describe('the band laid out', () => {
     expect(textOf(lines.find(line => line.key === 'row:feat/landed'))).toMatch(/cleanup +landed in main · has a worktree$/)
   })
 
+  test('a worktree on its way out says so, not how many files it lost', async () => {
+    const snapshot = await fixtureSnapshot()
+    const removing = (name: string) => ({
+      ...snapshot,
+      branches: snapshot.branches.map(branch =>
+        branch.name === name && branch.worktree !== null
+          ? { ...branch, worktree: { ...branch.worktree, dirty: 40, isBeingRemoved: true } }
+          : branch,
+      ),
+    })
+    const rowOf = (name: string) => textOf(bandLinesOf(modelOf(removing(name), { columns: 160 })).find(line => line.key === `row:${name}`))
+
+    expect(rowOf('feat/landed')).toMatch(/cleanup +landed in main · worktree being removed$/)
+    expect(rowOf('feat/wip')).toMatch(/in progress +.*worktree being removed/)
+    expect(rowOf('feat/wip')).not.toMatch(/uncommitted/)
+  })
+
   test('draws untrusted names as text', async () => {
     const snapshot = await fixtureSnapshot()
     const evil = {

@@ -6,6 +6,7 @@ import {
   baseOf,
   countStatus,
   displayPathOf,
+  isDeletionOnly,
   ownWorkOf,
   placeOf,
   readHeads,
@@ -183,6 +184,7 @@ async function factsOf(
       dirty: status === null ? null : countStatus(status.stdout),
       isMissing: worktree.isPrunable,
       isRebasing: worktree.isRebasing,
+      isBeingRemoved: status !== null && sessions.length === 0 && !worktree.isRebasing && isDeletionOnly(status.stdout),
       sessions,
     }
   }
@@ -413,8 +415,10 @@ async function read(input: ReadInput): Promise<ReadResult> {
 
     if (info.commits.size === 0) {
       // An idle session on a landed branch is left over; on a fresh one it
-      // may be about to start
-      info.lane = isDirty || isActive || (sessions.length > 0 && !info.isLanded) ? 'IN_PROGRESS' : 'CLEANUP'
+      // may be about to start. A worktree on its way out holds no work
+      const isWorked = isDirty && tree?.isBeingRemoved !== true
+
+      info.lane = isWorked || isActive || (sessions.length > 0 && !info.isLanded) ? 'IN_PROGRESS' : 'CLEANUP'
     } else if (input.holds[name] !== undefined) {
       info.lane = 'HOLD'
     } else if (isDirty || isActive) {
@@ -652,6 +656,8 @@ export function summaryOf(info: Omit<BranchInfo, 'summary'>, facts: ReadonlyMap<
 
   if (tree?.isMissing) {
     parts.push('worktree folder missing (prunable)')
+  } else if (tree?.isBeingRemoved) {
+    parts.push(`worktree ${tree.path} being removed`)
   } else if ((tree?.dirty ?? 0) > 0) {
     const dirty = tree?.dirty ?? 0
 
@@ -666,7 +672,7 @@ export function summaryOf(info: Omit<BranchInfo, 'summary'>, facts: ReadonlyMap<
     )
   }
 
-  if (tree !== null && lane === 'CLEANUP') {
+  if (tree !== null && lane === 'CLEANUP' && !tree.isBeingRemoved) {
     parts.push(`worktree ${tree.path}`)
   }
 

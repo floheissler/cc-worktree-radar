@@ -525,7 +525,9 @@ export function detailOf(branch: BranchInfo, base: string, ranks: ReadonlyMap<st
         parts.push({ text: `session ${name(busy.name)} ${name(busy.status)}` })
       }
 
-      if ((tree?.dirty ?? 0) > 0) {
+      if (tree?.isBeingRemoved) {
+        parts.push({ text: 'worktree being removed' })
+      } else if ((tree?.dirty ?? 0) > 0) {
         parts.push({ text: `${tree?.dirty} uncommitted` })
       }
 
@@ -545,7 +547,7 @@ export function detailOf(branch: BranchInfo, base: string, ranks: ReadonlyMap<st
 
       // Where it is, the snapshot says; here, that there is one to remove
       if (tree !== null) {
-        parts.push({ text: 'has a worktree' })
+        parts.push({ text: tree.isBeingRemoved ? 'worktree being removed' : 'has a worktree' })
       }
 
       break

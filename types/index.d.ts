@@ -60,6 +60,12 @@ export type WorktreeInfo = {
    */
   readonly isMissing: boolean
   readonly isRebasing: boolean
+  /**
+   * It reads as Claude Code deleting it (a closed job's worktree): nobody
+   * works there, tracked files are gone and nothing else changed. Its gone
+   * files are not work: a branch with nothing left to land stays CLEANUP.
+   */
+  readonly isBeingRemoved: boolean
   readonly sessions: readonly SessionInfo[]
 }
 

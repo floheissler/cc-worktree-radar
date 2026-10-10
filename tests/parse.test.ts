@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'claude-code/testing'
 
-import { baseOf, countStatus, displayPathOf, ownWorkOf, parseHeads, parseWorktrees, type Head } from '../hooks/repo'
+import { baseOf, countStatus, displayPathOf, isDeletionOnly, ownWorkOf, parseHeads, parseWorktrees, type Head } from '../hooks/repo'
 import { agentsByWorktree, claudeLockOf, folderKeyOf, parseSessions, sessionsByWorktree } from '../hooks/sessions'
 
 const head = (sha: string): Head => ({ sha, committedAt: 1, upstream: null })
@@ -54,6 +54,17 @@ describe('git output', () => {
     expect(displayPathOf('/work', '/work')).toBe('.')
     expect(displayPathOf('/work', '/elsewhere/x')).toBe('/elsewhere/x')
     expect(displayPathOf('/work', '/work-other')).toBe('/work-other')
+  })
+
+  test('tells a worktree being deleted from one with changes', () => {
+    // Tracked files gone; untracked ones a deleted .gitignore uncovers
+    expect(isDeletionOnly(' D .github/ci.yml\n D .gitignore\n?? node_modules/\n')).toBe(true)
+    expect(isDeletionOnly(' D README.md\n')).toBe(true)
+
+    // Anything changed, staged or only added is work
+    for (const status of ['', '?? new.txt\n', ' D a\n M b\n', 'D  a\n', ' D a\nA  b\n']) {
+      expect(isDeletionOnly(status)).toBe(false)
+    }
   })
 })
 

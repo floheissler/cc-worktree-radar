@@ -92,6 +92,39 @@ describe('reading a repository', () => {
     ])
   })
 
+  test('a worktree being deleted with nobody in it holds no work', async () => {
+    // Claude Code deleting a closed job's worktree, entry by entry: tracked
+    // files gone, untracked ones uncovered by the deleted .gitignore
+    const deleting = (worktree: string) => ({
+      ...RUNS,
+      [JSON.stringify([`/work/.claude/worktrees/${worktree}`, 'status', '--porcelain', '--untracked-files=normal'])]: {
+        code: 0,
+        stdout: ' D .gitignore\n D a.txt\n?? node_modules/\n',
+      },
+    })
+    const branchOf = async (runs: typeof RUNS, name: string, sessions: ReadInput['sessions'] = []) =>
+      (await snapshotOf(inputOf(replayOf(runs).run, { sessions }))).branches.find(branch => branch.name === name)
+
+    // Nothing left to land: it stays in cleanup
+    expect(await branchOf(deleting('landed'), 'feat/landed')).toMatchObject({
+      lane: 'CLEANUP',
+      worktree: { dirty: 3, isBeingRemoved: true },
+      summary: 'landed in main · worktree .claude/worktrees/landed being removed',
+    })
+    // Commits to land: still in progress, never ready while files are gone
+    expect(await branchOf(deleting('wip'), 'feat/wip')).toMatchObject({
+      lane: 'IN_PROGRESS',
+      worktree: { isBeingRemoved: true },
+    })
+    // Someone at work there deletes files: that is work
+    const busy = [{ id: 's', name: 'worker', status: 'idle', kind: 'session' as const, cwd: '/work/.claude/worktrees/landed', pid: 1 }]
+
+    expect(await branchOf(deleting('landed'), 'feat/landed', busy)).toMatchObject({
+      lane: 'IN_PROGRESS',
+      worktree: { isBeingRemoved: false },
+    })
+  })
+
   test('tells a branch that landed through a merge from one that never had work', async () => {
     const snapshot = await snapshotOf(inputOf(replayOf().run))
     const landed = snapshot.branches.find(branch => branch.name === 'feat/landed')

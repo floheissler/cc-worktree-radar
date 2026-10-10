@@ -109,7 +109,7 @@ The last 50 sessions that ended with the radar open are remembered.
 | stacked | holds every commit of another open branch, plus its own: land that one first |
 | in progress | uncommitted changes, a rebase under way, or a busy Claude session in its worktree; also a branch with no commits yet whose session is open, and a worktree a subagent works in (its row says `agent:` and its task) |
 | on hold | parked with `/radar hold` or the tool |
-| cleanup | nothing left to land: `landed in main` when its work reached the base, through a merge or a fast-forward (even with its session still open), else no commits and no session |
+| cleanup | nothing left to land: `landed in main` when its work reached the base, through a merge or a fast-forward (even with its session still open), else no commits and no session. `worktree being removed` while Claude Code deletes its worktree (a closed background job's): nobody there, tracked files going, nothing else changed |
 
 The ranking: stack parents first, then the landing that forces the least
 rebase work on the other branches (in a conflicting pair the bigger one lands
@@ -163,7 +163,7 @@ would conflict once it landed), `rebaseCost`, `waitsFor`, `isRebaseDue`,
 `isLanded` (nothing left to land, and its work reached the base: through a
 merge, or, as the branch's own reflog shows, a fast-forward),
 `hold`, `comment`, `worktree` (path, uncommitted files, rebase under way,
-sessions) and a one-line `summary`. A worktree's `sessions` lists who works
+`isBeingRemoved`, sessions) and a one-line `summary`. A worktree's `sessions` lists who works
 there: Claude sessions (`kind: "session"`: `id`, `name`, `status`) and
 subagents (`kind: "agent"`: the agent's `id`, which SendMessage addresses,
 `name`, `status`, `description` of its task where the radar's own session
