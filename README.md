@@ -1,8 +1,10 @@
 # worktree-radar
 
-A Claude Code mod for running several Claude sessions in parallel, each on its
-own branch or worktree. `/radar` shows a live view of them in the band above
-the prompt: which branches merge cleanly into the base branch, which conflict,
+[![CI](https://github.com/floheissler/cc-worktree-radar/actions/workflows/ci.yml/badge.svg)](https://github.com/floheissler/cc-worktree-radar/actions/workflows/ci.yml)
+
+A Claude Code mod for running several Claude sessions in parallel, each on
+its own branch or worktree. `/radar` shows every local branch in the band
+above the prompt: which merge cleanly into the base branch, which conflict,
 which are stacked on another, which a Claude session is still working on,
 and the order to land them in.
 
@@ -17,20 +19,76 @@ and the order to land them in.
   Worktree Radar · shop [main] · 2 ready · 1 needs rebase · 1 in progress · land next → feat/checkout      release v0.4.1 pending
 ```
 
+
+- **See every branch's lane** at a glance: ready, needs rebase, stacked, in
+  progress, on hold, cleanup.
+- **Know what lands next**: ready branches are ranked so that each landing
+  forces the least rebase work on the others.
+- **Catch conflicts before they happen**: simulated merges show which
+  branches conflict with the base, and which would conflict once another
+  one lands.
+- **See who works where**: the Claude session or subagent in each worktree,
+  busy or idle.
+- **Hold** a branch out of the landing order, say while it waits on a
+  review.
+- **Drive it from a skill**: Claude gets a tool to read the facts as JSON,
+  leave comments on rows and be woken when a branch becomes ready.
+- **Stay current**: it checks every few seconds, and comes back with your
+  session when you resume it.
+
 It only looks. It never merges, rebases, tags, pushes or moves a ref.
+
+It is a [mod](https://code.claude.com/docs/en/plugins/mods/overview): a plugin
+of function hooks that draws in Claude Code's own interface.
 
 ## Requirements
 
-- Claude Code with mods (2.1.295 or later).
-- git 2.38 or later (`git merge-tree --write-tree`).
+- **Claude Code 2.1.295 or later**, in a terminal: mods are on by default
+  there. Tested with Claude Code 2.1.295 and 2.1.296. Mods are a young part
+  of Claude Code and their API can change between releases, so after a
+  Claude Code update, update this mod too.
+- **git 2.38 or later** on the `PATH`: the conflict checks need `git
+  merge-tree --write-tree`.
+- **The `claude` command on the `PATH`**, to see which session works where
+  (`claude agents --json`). Without it, everything else works and the band
+  says `sessions unknown`.
+- The band draws in the terminal and in the Desktop app's Code tab (covered
+  by tests, not yet looked at live), nowhere else: not in the VS Code
+  extension's chat panel, or `claude -p`.
 
 ## Install
 
-```
+At the Claude Code prompt in a terminal:
+
+```text
 /plugin install worktree-radar --marketplace floheissler/cc-worktree-radar
 ```
 
-Answer `y` to add the marketplace, then pick a scope.
+Claude Code asks you to confirm adding the marketplace, then shows the
+plugin's details: review what it adds and pick a scope. Or, in two steps from
+your shell:
+
+```sh
+claude plugin marketplace add floheissler/cc-worktree-radar
+claude plugin install worktree-radar@cc-worktree-radar
+```
+
+Like every mod, it runs with your permissions: [Privacy](#privacy) lists
+what it touches, and you can check that yourself before installing.
+
+This repository is its own marketplace, named `cc-worktree-radar`.
+Marketplaces other than Anthropic's don't update on their own: run
+`claude plugin update worktree-radar@cc-worktree-radar` for a new release,
+or turn on auto-update for `cc-worktree-radar` in `/plugin` under
+**Marketplaces**.
+
+To run it from a local checkout for one session instead:
+
+```sh
+claude --plugin-dir /path/to/cc-worktree-radar
+```
+
+Then, in a session inside a git repository, run `/radar`.
 
 ## Use
 
