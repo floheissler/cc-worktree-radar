@@ -124,8 +124,7 @@ themselves.
 ## Driving it from a skill
 
 The mod gives the model a tool, `mcp__worktree-radar__radar`, so a skill of
-your own can open the radar and act on what it sees. Allow it in the skill's
-`allowed-tools` (or your permissions) to skip the prompt.
+your own can open the radar and act on what it sees.
 
 | Action | Input | Does |
 |---|---|---|
