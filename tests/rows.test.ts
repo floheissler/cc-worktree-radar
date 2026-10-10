@@ -44,7 +44,19 @@ async function fixtureSnapshot(): Promise<Snapshot> {
 }
 
 function modelOf(snapshot: Snapshot | null, changes: Partial<BandModel> = {}): BandModel {
-  return { snapshot, problem: null, status: null, root: '/work', now: NOW, columns: 100, maxRows: 40, isHelpShown: false, isCompact: false, ...changes }
+  return {
+    snapshot,
+    problem: null,
+    status: null,
+    root: '/work',
+    now: NOW,
+    columns: 100,
+    maxRows: 40,
+    isHelpShown: false,
+    isCompact: false,
+    themeSetting: 'dark',
+    ...changes,
+  }
 }
 
 const textOf = (line: Line | undefined): string => line?.segments.map(segment => segment.text).join('') ?? ''
@@ -126,6 +138,18 @@ describe('the band laid out', () => {
     expect(laneOf(lines[8])).toMatchObject({ color: 'suggestion' })
     expect(laneOf(lines[9])).toMatchObject({ color: 'merged' })
     expect(laneOf(lines[10])).toMatchObject({ color: 'inactive' })
+  })
+
+  test('colors the base by the theme: orange 208 on dark, darker on light, between when unknown', async () => {
+    const snapshot = await fixtureSnapshot()
+    const baseOf = (themeSetting: string | null) =>
+      bandLinesOf(modelOf(snapshot, { columns: 140, themeSetting }))
+        .at(-1)
+        ?.segments.find(segment => segment.text === '[main]')?.color
+
+    expect([baseOf('dark'), baseOf('dark-daltonized'), baseOf('dark-ansi')]).toEqual(['#ff8700', '#ff8700', '#ff8700'])
+    expect([baseOf('light'), baseOf('light-daltonized'), baseOf('light-ansi')]).toEqual(['#af5f00', '#af5f00', '#af5f00'])
+    expect([baseOf('auto'), baseOf('my-theme'), baseOf(null)]).toEqual(['#d75f00', '#d75f00', '#d75f00'])
   })
 
   test('draws the facts in the text color, and dims only what is not data', async () => {

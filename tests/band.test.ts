@@ -432,6 +432,47 @@ describe('the radar tool', () => {
     expect(foot).toMatch(/feat\/parent +main worktree: session fix-menu$/)
   })
 
+  test('colors the base by the theme setting, and follows a change in /config', async ($, on) => {
+    let theme = 'light'
+
+    on('config.list', () => ({
+      value: [{ key: 'theme', label: 'Theme', kind: 'choice', value: theme, provider: { plugin: 'engine', tier: 'core' }, isLocked: false }] as never,
+    }))
+    on('config.set', ($, e) => {
+      theme = String(e.value)
+
+      return { value: e.value }
+    })
+
+    const { clock } = worldOf(on)
+    const opened = $.tool.call({ tool: TOOL, action: 'open' } as never)
+    const baseColor = async () => {
+      const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
+      const found = await ui.findAll({ type: 'Text', text: /^\[main\]$/ })
+
+      await ui.unmount()
+
+      return found.map(element => element.props['color'])
+    }
+
+    await settled(clock)
+    await opened
+
+    expect(await baseColor()).toEqual(['#af5f00'])
+
+    // The person picks a dark theme in /config
+    await $.config.set({
+      key: 'theme',
+      value: 'dark',
+      previous: 'light',
+      provider: { plugin: 'engine', tier: 'core' },
+      origin: { kind: 'composer' },
+    })
+    await settled(clock)
+
+    expect(await baseColor()).toEqual(['#ff8700'])
+  })
+
   test('refuses what it cannot do', async ($, on) => {
     const { clock } = worldOf(on)
     const snapshot = await $.tool.call({ tool: TOOL, action: 'snapshot' } as never)

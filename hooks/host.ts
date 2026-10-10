@@ -26,6 +26,7 @@ export type RadarState = {
   readonly helpShown: StateCell<boolean>
   readonly compact: StateCell<boolean>
   readonly dueMarks: StateCell<Record<string, string>>
+  readonly themeSetting: StateCell<string | null>
 }
 
 /**
@@ -68,6 +69,11 @@ export type Host = {
    * where the engine cannot say.
    */
   readonly agents: () => Promise<readonly AgentRow[]>
+  /**
+   * The person's theme setting, `$.config.list()`'s `theme` row; null where
+   * it cannot be read.
+   */
+  readonly themeSetting: () => Promise<string | null>
   /**
    * A file's text, or null where it cannot be read.
    */

@@ -308,7 +308,16 @@ export function createRadar(): Radar {
     commonDirs.set(radar.root, result.commonDir)
     shownFingerprint = probe?.fingerprint ?? null
 
-    const before = await host.state.snapshot.get()
+    const [before, theme, shownTheme] = await Promise.all([
+      host.state.snapshot.get(),
+      host.themeSetting(),
+      host.state.themeSetting.get(),
+    ])
+
+    // The theme picks the base's color; a read keeps it current
+    if (theme !== shownTheme) {
+      await host.state.themeSetting.set(() => theme)
+    }
 
     await host.state.snapshot.set(() => result.snapshot)
     await host.state.problem.set(() => null)

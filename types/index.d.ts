@@ -264,6 +264,12 @@ declare module 'claude-code' {
        */
       compact: boolean
       /**
+       * The person's theme setting, `/config`'s `theme` row: `dark`,
+       * `light`, their colorblind-friendly and ANSI kin, `auto`, or a custom
+       * theme's; null before it is read. The base's color follows it.
+       */
+      themeSetting: string | null
+      /**
        * Branches found due a rebase, by name, at the tip they were due on:
        * while one is in progress afterwards, it is being rebased, and the
        * branches it conflicts with wait for it.

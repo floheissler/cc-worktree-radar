@@ -28,6 +28,7 @@ const STATUS = atom({ plugin: 'worktree-radar', key: 'status' } as const, null)
 const HELP_SHOWN = atom({ plugin: 'worktree-radar', key: 'helpShown' } as const, false)
 const COMPACT = atom({ plugin: 'worktree-radar', key: 'compact' } as const, false)
 const DUE_MARKS = atom({ plugin: 'worktree-radar', key: 'dueMarks' } as const, {})
+const THEME_SETTING = atom({ plugin: 'worktree-radar', key: 'themeSetting' } as const, null)
 
 /**
  * Reads the person's settings, each checked: `userConfig` in plugin.json.
@@ -60,6 +61,15 @@ function hostOf($: EngineInterface, options: RadarOptions): Host {
       $.agent.list().then(
         agents => agents.map(agent => ({ id: agent.id, name: agent.name ?? null, description: agent.description, status: agent.status })),
         () => [],
+      ),
+    themeSetting: () =>
+      $.config.list().then(
+        rows => {
+          const value = rows.find(row => row.key === 'theme')?.value
+
+          return typeof value === 'string' ? value : null
+        },
+        () => null,
       ),
     readText: path => $.fs.read(path).then(
       text => text,
@@ -128,6 +138,12 @@ function hostOf($: EngineInterface, options: RadarOptions): Host {
         get: () => read($, DUE_MARKS),
         set: async fn => {
           await update($, DUE_MARKS, fn)
+        },
+      },
+      themeSetting: {
+        get: () => read($, THEME_SETTING),
+        set: async fn => {
+          await update($, THEME_SETTING, fn)
         },
       },
     },
@@ -502,6 +518,19 @@ export const register: Register = (on, pluginOptions) => {
     }
   }).catch(($, e, next) => (next.called ? next(e) : { deny: 'worktree-radar failed to answer; see claude --debug' }))
 
+  // The theme changed in /config: the base's color follows at once (a read
+  // picks up a change made another way)
+  on('config.set', { key: 'theme' }, async ($, e, next) => {
+    const result = await next(e)
+    const value = result.value
+
+    if (typeof value === 'string') {
+      await hostOf($, options).state.themeSetting.set(() => value)
+    }
+
+    return result
+  })
+
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     const host = hostOf($, options)
     const open = await host.state.radar.get()
@@ -510,12 +539,13 @@ export const register: Register = (on, pluginOptions) => {
       return next(e)
     }
 
-    const [snapshot, problem, status, isHelpShown, isCompact, now] = await Promise.all([
+    const [snapshot, problem, status, isHelpShown, isCompact, themeSetting, now] = await Promise.all([
       host.state.snapshot.get(),
       host.state.problem.get(),
       host.state.status.get(),
       host.state.helpShown.get(),
       host.state.compact.get(),
+      host.state.themeSetting.get(),
       host.now(),
     ])
     const columns = e.props.bodyColumns
@@ -530,6 +560,7 @@ export const register: Register = (on, pluginOptions) => {
       maxRows: frame.maxRows,
       isHelpShown,
       isCompact,
+      themeSetting,
     })
     const controls = controlsOf(frame.columns, isHelpShown, isCompact)
 

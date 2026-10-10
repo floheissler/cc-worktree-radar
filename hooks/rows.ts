@@ -62,6 +62,10 @@ export type BandModel = {
    * Whether the queue is folded into the header's one line.
    */
   readonly isCompact: boolean
+  /**
+   * The person's theme setting, for the base's color; null where unknown.
+   */
+  readonly themeSetting: string | null
 }
 
 /**
@@ -167,12 +171,27 @@ const COMMENT_MIN_CELLS = 16
 const COMMENT_NAME = 'COMMENT'
 
 /**
- * The base branch's color in the status line: xterm's orange 208, the one
- * the owner's own status line names the branch with, so the two agree. A
- * raw color, as no theme key holds it (`claude`, Claude's orange, marks a
- * comment); it reads on a dark and a light background alike.
+ * The base branch's color in the status line, by the person's theme
+ * setting. A dark theme gets xterm's orange 208, the one the owner's own
+ * status line names the branch with, so the two agree (6.9:1 on #1e1e1e).
+ * On white 208 reads 2.4:1 (seen live in the light theme, the band's one
+ * color under 4.4:1), so a light theme gets 130, a darker orange (4.7:1).
+ * Where the background is unknown (`auto`, which follows the terminal, a
+ * custom theme, the setting not read), 166 between them: 3.8:1 on white,
+ * 4.4:1 on #1e1e1e. Raw colors: no theme key is an orange that reads on
+ * white (Claude's own `claude` is 3.2:1 there), and a mod cannot learn
+ * which theme `auto` chose.
+ *
+ * @param themeSetting the theme setting, `/config`'s `theme` row
+ * @returns the color
  */
-const BASE_COLOR = '#ff8700'
+export function baseColorOf(themeSetting: string | null): string {
+  if (themeSetting?.startsWith('dark') === true) {
+    return '#ff8700'
+  }
+
+  return themeSetting?.startsWith('light') === true ? '#af5f00' : '#d75f00'
+}
 
 /**
  * What marks a comment as Claude's words: the mark Claude Code draws its
@@ -662,7 +681,7 @@ function placeOf(model: BandModel, snapshot: Snapshot): Segment[] {
   return [
     { text: sanitize(nameOf(snapshot.repo || model.root)) },
     { text: ' ' },
-    { text: `[${sanitize(snapshot.base.name)}]`, color: BASE_COLOR },
+    { text: `[${sanitize(snapshot.base.name)}]`, color: baseColorOf(model.themeSetting) },
   ]
 }
 

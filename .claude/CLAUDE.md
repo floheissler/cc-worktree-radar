@@ -201,9 +201,18 @@ the module otherwise:
   the laid MCP types do not list a plugin's own tool, so a literal fails
   `tsc`.
 - Colors are theme keys, so the band follows the person's theme, with one
-  exception: the base (`[main]`) in the status line is xterm's orange 208
-  (`BASE_COLOR`, `#ff8700`), as the owner's own status line names the
-  branch, which no theme key holds.
+  exception: the base (`[main]`) in the status line is a raw orange chosen
+  by the theme setting (`baseColorOf`, the `themeSetting` state, read from
+  `$.config.list()` at each read and on `config.set` for `theme`). Dark
+  themes get xterm's 208 (`#ff8700`), as the owner's own status line names
+  the branch; light themes 130 (`#af5f00`, 4.7:1 on white); `auto`, a custom
+  theme or none read 166 (`#d75f00`, 3.8:1 on white, 4.4:1 on `#1e1e1e`).
+  Checked live on 2.1.296 (light theme, tmux, the capture's colors
+  measured): 208 read 2.4:1 on white, the band's one color under 4.4:1; no
+  theme key is an orange that reads on white (`claude` is 3.2:1), and a mod
+  cannot learn which theme `auto` resolved to. Picking a theme in a lab
+  session's `/theme` writes the person's own `~/.claude/settings.json`:
+  start the lab with `--settings '{"theme":"light"}'` instead.
 - Lanes are colored with theme keys (`LANE_COLORS`), and every line is
   fitted to `bodyColumns` in cells; `rows.test.ts` sweeps 1–160 columns,
   the queue and the help alike.
