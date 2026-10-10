@@ -243,7 +243,13 @@ the module otherwise:
   a status, not a comment. Under the frame, not in it (`view.tsx`), the
   foot is a status line read left to right (`statusLayoutsOf`): the title,
   `repo [base]`, the counts, `land next →`; messages (a caller's status,
-  what to know) right-aligned. Short of room it gives up, in order, the long
+  what to know) right-aligned. What to know includes the main worktree:
+  who works there but the radar's own session (`mainWorktreeSessions`,
+  left out by `$.session.id()`, which is `claude agents`' `sessionId`) and
+  what is uncommitted there, in one message (`main worktree: session
+  fix-menu, 2 uncommitted`). From the D3 dogfood: two workers started in
+  the main worktree, the coordinator's own, where their work showed on no
+  row and a `git checkout -b` would have moved it off the base. Short of room it gives up, in order, the long
   lane labels, the title, the place and the counts; a message may push out
   the labels and the title (`MESSAGE_OUTRANKS`), never more. Compact, the
   frame goes and the band is that status line alone (`headerOf`, the same

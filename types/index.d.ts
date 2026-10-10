@@ -164,6 +164,12 @@ export type Snapshot = {
      * Tracked files with uncommitted changes in the main worktree.
      */
     readonly mainWorktreeDirty: number | null
+    /**
+     * Who works in the main worktree, but the session the radar runs in:
+     * work there shows on no branch's row while the base is checked out,
+     * and a branch made there moves the main worktree off the base.
+     */
+    readonly mainWorktreeSessions: readonly SessionInfo[]
   }
   /**
    * Whether the running Claude sessions could be listed.

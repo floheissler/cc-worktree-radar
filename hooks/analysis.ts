@@ -50,6 +50,10 @@ export type ReadInput = {
    * The subagents of the session the radar runs in (`$.agent.list()`).
    */
   readonly agents: readonly AgentRow[]
+  /**
+   * The session the radar runs in, by id; null where it is not known.
+   */
+  readonly self: string | null
   readonly holds: Readonly<Record<string, Hold>>
   readonly comments: Readonly<Record<string, CallerComment>>
   /**
@@ -508,6 +512,9 @@ async function read(input: ReadInput): Promise<ReadResult> {
         upstream: baseHead.upstream,
         mainWorktreeBranch: trees[0]?.branch ?? null,
         mainWorktreeDirty: mainStatus === null ? null : countStatus(mainStatus.stdout),
+        mainWorktreeSessions: (trees[0] ? (attached.get(trees[0].path) ?? []) : []).filter(
+          session => session.kind !== 'session' || session.id !== input.self,
+        ),
       },
       areSessionsKnown: input.sessions !== null,
       next: ranked[0] ?? null,

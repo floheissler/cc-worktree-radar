@@ -416,6 +416,22 @@ describe('the radar tool', () => {
     })
   })
 
+  test('names a session at work in the main worktree, never its own', async ($, on) => {
+    const sessions = JSON.stringify([
+      { pid: 1, sessionId: SESSION, name: 'coordinator', cwd: '/work', kind: 'interactive', status: 'busy' },
+      { pid: 2, sessionId: 'session-w', name: 'fix-menu', cwd: '/work', kind: 'background', status: 'busy' },
+    ])
+    const { clock } = worldOf(on, { current: RUNS, sessions })
+    const opened = $.tool.call({ tool: TOOL, action: 'open' } as never)
+
+    await settled(clock)
+    await opened
+
+    const foot = (await bandText($)).find(text => text.includes('land next')) ?? ''
+
+    expect(foot).toMatch(/feat\/parent +main worktree: session fix-menu$/)
+  })
+
   test('refuses what it cannot do', async ($, on) => {
     const { clock } = worldOf(on)
     const snapshot = await $.tool.call({ tool: TOOL, action: 'snapshot' } as never)

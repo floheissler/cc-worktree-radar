@@ -14,6 +14,7 @@ async function fixtureSnapshot(): Promise<Snapshot> {
     readText: async () => null,
     sessions: [],
     agents: [],
+    self: null,
     holds: HOLDS,
     comments: {},
     dueMarks: {},

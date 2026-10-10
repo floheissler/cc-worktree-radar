@@ -28,6 +28,7 @@ async function fixtureSnapshot(): Promise<Snapshot> {
     readText: async () => null,
     sessions: [],
     agents: [],
+    self: null,
     holds: HOLDS,
     comments: {},
     dueMarks: {},
@@ -268,6 +269,17 @@ describe('the band laid out', () => {
     const message = bandLinesOf(modelOf(snapshot, { columns: 131, status: 'release v0.4.1 pending' })).at(-1)
 
     expect(textOf(message)).toMatch(/^work \[main\] · 4 ready · 2 rebase · .* · land next → feat\/parent +release v0\.4\.1 pending$/)
+  })
+
+  test('says who works in the main worktree, by name, or how many', async () => {
+    const snapshot = await fixtureSnapshot()
+    const worker = { id: 's', name: 'fix-\u001bmenu', status: 'busy', kind: 'session' as const }
+    const footOf = (sessions: (typeof worker)[]) =>
+      textOf(bandLinesOf(modelOf({ ...snapshot, base: { ...snapshot.base, mainWorktreeDirty: 2, mainWorktreeSessions: sessions } }, { columns: 220 })).at(-1))
+
+    expect(footOf([worker])).toMatch(/feat\/parent +main worktree: session fix-␛menu, 2 uncommitted$/)
+    expect(footOf([worker, { ...worker, id: 't' }])).toMatch(/feat\/parent +main worktree: 2 sessions, 2 uncommitted$/)
+    expect(footOf([])).toMatch(/feat\/parent +main worktree: 2 uncommitted$/)
   })
 
   test('before the first read, and when there is nothing to read', async () => {

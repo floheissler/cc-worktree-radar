@@ -13,6 +13,7 @@ function inputOf(run: ReturnType<typeof replayOf>['run'], changes: Partial<ReadI
     readText: async () => null,
     sessions: [],
     agents: [],
+    self: null,
     holds: HOLDS,
     comments: {},
     dueMarks: {},
@@ -74,6 +75,21 @@ describe('reading a repository', () => {
     const unknown = await snapshotOf(inputOf(replayOf().run, { sessions: null }))
 
     expect(unknown.areSessionsKnown).toBe(false)
+  })
+
+  test('names who works in the main worktree, but the radar\'s own session', async () => {
+    const sessions = [
+      { id: 'self', name: 'coordinator', status: 'busy', kind: 'session' as const, cwd: '/work', pid: 1 },
+      { id: 'w', name: 'fix-menu', status: 'busy', kind: 'session' as const, cwd: '/work/src', pid: 2 },
+      { id: 'x', name: 'wip-session', status: 'idle', kind: 'session' as const, cwd: '/work/.claude/worktrees/wip', pid: 3 },
+    ]
+    const snapshot = await snapshotOf(inputOf(replayOf().run, { sessions, self: 'self' }))
+
+    expect(snapshot.base.mainWorktreeSessions).toEqual([{ id: 'w', name: 'fix-menu', status: 'busy', kind: 'session' }])
+    expect((await snapshotOf(inputOf(replayOf().run, { sessions }))).base.mainWorktreeSessions.map(session => session.id)).toEqual([
+      'self',
+      'w',
+    ])
   })
 
   test('tells a branch that landed through a merge from one that never had work', async () => {

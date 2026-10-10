@@ -802,8 +802,8 @@ const MESSAGE_OUTRANKS = 3
 /**
  * The foot, a status line read left to right: the radar, where it looks,
  * what each lane holds, what lands next. Its right end is for messages: a
- * caller's line, then what to know (uncommitted files in the main worktree,
- * sessions unknown, a failed read). A narrow band gives up the messages,
+ * caller's line, then what to know (who works in the main worktree and
+ * what is uncommitted there, sessions unknown, a failed read). A narrow band gives up the messages,
  * then the long lane labels, the title, the place and the
  * counts, before what lands next.
  */
@@ -835,14 +835,23 @@ function footOf(model: BandModel, snapshot: Snapshot, columns: number): Line {
  */
 function messagesOf(model: BandModel, snapshot: Snapshot): Segment[] {
   const dirty = snapshot.base.mainWorktreeDirty ?? 0
+  const sessions = snapshot.base.mainWorktreeSessions
   const messages: Segment[] = []
 
   if (model.status !== null && model.status !== '') {
     messages.push({ text: sanitize(model.status), color: 'remember' })
   }
 
-  if (dirty > 0) {
-    messages.push({ text: `main worktree: ${dirty} uncommitted`, color: 'warning' })
+  // Who works in the main worktree, then what is uncommitted there: work
+  // that shows on no branch's row
+  const main = [
+    ...(sessions.length === 1 ? [`session ${sanitize(sessions[0]?.name ?? '')}`] : []),
+    ...(sessions.length > 1 ? [`${sessions.length} sessions`] : []),
+    ...(dirty > 0 ? [`${dirty} uncommitted`] : []),
+  ]
+
+  if (main.length > 0) {
+    messages.push({ text: `main worktree: ${main.join(', ')}`, color: 'warning' })
   }
 
   if (!snapshot.areSessionsKnown) {

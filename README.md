@@ -70,10 +70,12 @@ The band is framed like a panel, with three controls in its header:
 
 Under the panel, the status line reads left to right: the title, the
 repository and its base (`shop [main]`), what each lane holds, and what
-lands next. Its right end holds messages: a skill's status line, uncommitted
-files in the main worktree, a failed read. On a narrow band the messages go
-first, then the long lane labels (`2 rebase`, `1 wip`), the title, the
-repository and the counts; `land next` stays to the end. Compact, the
+lands next. Its right end holds messages: a skill's status line, who works
+in the main worktree and what is uncommitted there (`main worktree: session
+fix-menu, 2 uncommitted`, work no row shows while the base is checked out
+there; the radar's own session is left out), a failed read. On a narrow band
+the messages go first, then the long lane labels (`2 rebase`, `1 wip`), the
+title, the repository and the counts; `land next` stays to the end. Compact, the
 panel goes and the status line stays alone above the prompt, the controls
 at its end where the messages were; only a failed read still shows.
 
@@ -152,7 +154,8 @@ to land the branch itself. What to do on an event is your skill's to say:
 told to land ready branches, a model does; told nothing, it reports.
 
 The snapshot is JSON (`schema: 1`): the repository, the base (`name`, `sha`,
-`upstream`, uncommitted files in the main worktree), whether sessions could be
+`upstream`, uncommitted files in the main worktree, `mainWorktreeSessions`:
+who works there but the radar's own session), whether sessions could be
 listed, `next`, and per branch: `name`, `sha`, `lane`, `rank`, `ahead`,
 `behind`, `fileCount`, `insertions`, `deletions`, `lastCommitAt`, `upstream`,
 `conflicts`, `stackedOn`, `dependents`, `sharesWith`, `breaks` (branches that
