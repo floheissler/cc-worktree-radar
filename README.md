@@ -8,6 +8,11 @@ above the prompt: which merge cleanly into the base branch, which conflict,
 which are stacked on another, which a Claude session is still working on,
 and the order to land them in.
 
+<!-- DEMO: put the GIF (under 1 MB) at docs/demo.gif and replace this
+comment with the line below; screenshots go next to it in docs/.
+![/radar above a Claude Code prompt: branches in their lanes, the ready ones ranked, a conflict with its rebase order, and the status line naming what lands next](docs/demo.gif)
+-->
+
 ```
 ╭─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
 │  # BRANCH         LANE        AHEAD  AGE  DETAIL                                           COMMENT   h: help c: compact x: exit │
