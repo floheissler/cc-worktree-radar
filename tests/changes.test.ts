@@ -91,6 +91,14 @@ describe('events between two reads', () => {
     })
 
     expect(eventsOf(working, done).map(event => [event.kind, event.text])).toEqual([['session-idle', 'agent agent-abc on feat/wip finished']])
+
+    // An agent that stops without leaving (a teammate waiting for a message)
+    // is named an agent
+    const waiting = withBranch(after, 'feat/wip', {
+      worktree: { path: 'w', absPath: '/work/w', dirty: 0, isMissing: false, isRebasing: false, isBeingRemoved: false, sessions: [{ ...agent, status: 'idle' }] },
+    })
+
+    expect(eventsOf(working, waiting).map(event => [event.kind, event.text])).toEqual([['session-idle', 'agent agent-abc on feat/wip went idle']])
     expect(events[0]?.text).toMatch(/^main moved 0000000→[0-9a-f]{7}$/)
     expect(events[1]?.text).toBe('session worker on feat/wip went idle')
   })

@@ -123,7 +123,7 @@ export function eventsOf(before: Snapshot | null, after: Snapshot): RadarEvent[]
         events.push({
           kind: 'session-idle',
           key: `session-idle:${session.id}:${branch.sha}`,
-          text: `session ${session.name} on ${branch.name} went ${session.status}`,
+          text: `${session.kind} ${session.name} on ${branch.name} went ${session.status}`,
           branch,
         })
       }
