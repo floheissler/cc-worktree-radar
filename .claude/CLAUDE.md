@@ -407,10 +407,15 @@ when it loads the mod with `claude --plugin-dir .`; start one such session
 after a Claude Code update to refresh the types. The types file is the API
 reference for the running build: grep it for an event or method name.
 
-For daily use, install the mod from this folder as a local marketplace
-(`worktree-radar@cc-worktree-radar`, read in place) and run
-`/reload-plugins` after an edit. File watching is unreliable under `/mnt/c`,
-so do not count on `--plugin-dir` hot reloading here.
+The owner runs the published mod: `worktree-radar@cc-worktree-radar` from
+the GitHub marketplace, a copy of the last released version. To try an
+edit, start a session with `claude --plugin-dir .`: that session loads the
+working copy and skips the installed one (the plugin CLI reference), with a
+store of its own. File watching is unreliable under `/mnt/c`, so run
+`/reload-plugins` after an edit rather than count on hot reloading. A
+release reaches the installed copy only with a new `version` in
+`plugin.json`, then `claude plugin update worktree-radar@cc-worktree-radar`
+(or the marketplace's auto-update).
 
 Docs: https://code.claude.com/docs/en/plugins/mods/overview (create, interface,
 events, api, test, reference pages). Anthropic's own mods, including `/diff`,
