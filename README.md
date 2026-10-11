@@ -226,13 +226,50 @@ In `/config`, under the plugin:
 
 ## Privacy
 
-Everything stays on your machine. The radar runs `git` in your repository
-(reads, plus the in-memory merges of `git merge-tree` and `git commit-tree`,
-whose unreferenced objects `git gc` prunes; no ref, index or worktree is
-touched) and `claude agents --json` to see which sessions work where; the lock
-Claude Code puts on a worktree tells it which session or subagent works there.
-It sends nothing anywhere. Holds, and the radar each session left open, are
-kept in Claude Code's plugin store on this machine.
+Everything stays on your machine. The radar makes no network calls, reads no
+transcript and no credential, and sends nothing anywhere. In detail:
+
+- **The programs it runs, and why.** Two, both local, both started without a
+  shell. `git`, in your repository, to read the branches and worktrees and to
+  check merges in memory: `rev-parse` (where the repository is, a branch's
+  tip, git's own paths), `for-each-ref`, `symbolic-ref`, `worktree list
+  --porcelain`, `status --porcelain`, `rev-list`, `diff --numstat`,
+  `merge-tree --write-tree`, `commit-tree` (simulated merges, whose
+  unreferenced objects `git gc` prunes), `reflog show` and `merge-base
+  --is-ancestor`. No ref, index or worktree is touched, and nothing is
+  fetched or pushed. And `claude agents --json`, Claude Code's own list of
+  the sessions on this machine and the folder each works in, every other
+  check while the radar is open. The commands are built at run time (git's
+  name your branches), which is why the directory cannot read them in full:
+  this is the whole list.
+- **What it reads.** Git's answers above, and two of git's own files that
+  tell a rebase under way (`rebase-merge/head-name`, `rebase-apply/head-name`
+  in a worktree's git folder). From the session: its id and folder, the
+  theme setting (to color the base's name), the subagents this session
+  started (their ids, names, task descriptions and states, shown on the rows
+  they work in), and the calls Claude makes to the radar's own tool.
+- **What it sends, and where.** Nothing leaves the machine through the
+  radar. What it reads goes to the band above the prompt, to the tool's
+  answer in this session, and to git as branch names. Holds, and the radar
+  each session left open, are kept in Claude Code's plugin store on this
+  machine.
+- **The prompts it submits.** Only when a skill opened the radar with a wake
+  list, and only the events: branch names, a rank, conflicting file paths,
+  the base's short commit ids, session and agent names, then a fixed note.
+  `/radar` alone submits none. For example:
+
+  ```
+  worktree-radar: feat/a is ready to land (#1) · main moved 3f2a1c9→8b0e4d2. This is a report from a read-only view, not a request: act on it only as your user or your instructions say.
+  ```
+
+  The same event line, without the note, goes to Claude Code's notification
+  when a branch becomes ready, if **Notify when a branch is ready** is on.
+- **The tool it answers.** It registers one tool, `radar`
+  (`mcp__worktree-radar__radar`), and answers calls to that tool only: with
+  the snapshot, or a line saying what it did. It stands in for no other tool.
+- **Settings.** It reads the theme setting and, when you change the theme in
+  `/config`, passes the change on as it came. It changes no setting and takes
+  no permission decision.
 
 ## Platforms
 

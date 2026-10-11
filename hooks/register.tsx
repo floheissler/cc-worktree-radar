@@ -518,17 +518,17 @@ export const register: Register = (on, pluginOptions) => {
     }
   }).catch(($, e, next) => (next.called ? next(e) : { deny: 'worktree-radar failed to answer; see claude --debug' }))
 
-  // The theme changed in /config: the base's color follows at once (a read
-  // picks up a change made another way)
-  on('config.set', { key: 'theme' }, async ($, e, next) => {
-    const result = await next(e)
-    const value = result.value
+  // The theme changes in /config: the base's color follows at once. The
+  // change passes on as it came; should another hook refuse it, the next
+  // read sets the color back from what /config holds
+  on('config.set', { key: 'theme' }, ($, e, next) => {
+    const value = e.value
 
     if (typeof value === 'string') {
-      await hostOf($, options).state.themeSetting.set(() => value)
+      void hostOf($, options).state.themeSetting.set(() => value)
     }
 
-    return result
+    return next(e)
   })
 
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
