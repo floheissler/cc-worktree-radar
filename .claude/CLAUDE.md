@@ -30,6 +30,8 @@ and you are asked for the next item, start there.
   `/plugin install worktree-radar --marketplace floheissler/cc-worktree-radar`.
 - `.claude/CLAUDE.md`: this file. It lives under `.claude/` because a
   `CLAUDE.md` at the plugin root fails `claude plugin validate --strict`.
+- `assets/`: the README's demo GIF and screenshot, shrunk for GitHub (the
+  GIF 1600 px wide with a 128-color octree palette, under 1 MB).
 - `.github/workflows/ci.yml`: validate and the tests on Ubuntu, Windows and
   macOS. Anthropic's directory scans it: install Claude Code there with
   npm, never a download piped into a shell.

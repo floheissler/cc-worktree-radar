@@ -8,22 +8,7 @@ above the prompt: which merge cleanly into the base branch, which conflict,
 which are stacked on another, which a Claude session is still working on,
 and the order to land them in.
 
-<!-- DEMO: put the GIF (under 1 MB) at docs/demo.gif and replace this
-comment with the line below; screenshots go next to it in docs/.
-![/radar above a Claude Code prompt: branches in their lanes, the ready ones ranked, a conflict with its rebase order, and the status line naming what lands next](docs/demo.gif)
--->
-
-```
-╭─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-│  # BRANCH         LANE        AHEAD  AGE  DETAIL                                           COMMENT   h: help c: compact x: exit │
-│  1 feat/checkout  ready          +4  12m                                                                                        │
-│  2 fix/totals     ready          +1   3m  forces a rebase of feat/coupons                                                       │
-│  - feat/coupons   needs rebase   +6  20m  conflicts: cart.ts · rebase after #2 fix/totals  ✻ “handed back to coupons-worker”    │
-│  - feat/search    in progress    +2   1m  session search-worker busy                                                            │
-╰─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
-  Worktree Radar · shop [main] · 2 ready · 1 needs rebase · 1 in progress · land next → feat/checkout      release v0.4.1 pending
-```
-
+![/radar typed in a Claude Code session, and the band opening above the prompt: every branch of the repository in its lane, the ready ones ranked, and the status line naming what lands next](assets/demo.gif)
 
 - **See every branch's lane** at a glance: ready, needs rebase, stacked, in
   progress, on hold, cleanup.
@@ -105,6 +90,8 @@ Then, in a session inside a git repository, run `/radar`.
 | `/radar hold <branch> [reason]` | Parks a branch, say one that is done but waits on a review: it leaves the landing order (the ready lane and `next`) whatever else it shows. Only the radar records it: the branch and git stay as they are. Every session of the repository on this machine sees the hold until it is let go |
 | `/radar unhold <branch>` | Lets it go again |
 | `/radar off` | Closes the radar |
+
+![The band: four ready branches ranked, two of which would force each other to rebase, with Claude's comment on which lands first; a branch that needs a rebase, a stacked one, one in progress, one on hold and three to clean up. Under it the status line: the counts, what lands next, a skill's status and who works in the main worktree](assets/band.png)
 
 Each row is a branch: its place in the landing order, its lane, the commits it
 has ahead and the age of the last one. DETAIL is what the radar reads about
