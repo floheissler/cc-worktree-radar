@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Worktree Radar">
+  <defs>
+    <linearGradient id="sweep" x1="256" y1="110" x2="372" y2="190" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#f0b43c" stop-opacity="0.05"/>
+      <stop offset="1" stop-color="#f0b43c" stop-opacity="0.5"/>
+    </linearGradient>
+    <clipPath id="scope">
+      <circle cx="256" cy="256" r="176"/>
+    </clipPath>
+  </defs>
+  <rect width="512" height="512" rx="108" fill="#1e2330"/>
+  <circle cx="256" cy="256" r="176" fill="#252b3a"/>
+  <g fill="none" stroke="#8b93a7" stroke-width="10" opacity="0.55">
+    <circle cx="256" cy="256" r="117"/>
+    <circle cx="256" cy="256" r="58"/>
+    <path d="M256 80V432M80 256H432" stroke-width="8"/>
+  </g>
+  <path d="M256 256L256 80A176 176 0 0 1 408.4 168Z" fill="url(#sweep)" clip-path="url(#scope)"/>
+  <path d="M256 256L399.8 173" stroke="#f0b43c" stroke-width="18" stroke-linecap="round"/>
+  <circle cx="256" cy="256" r="176" fill="none" stroke="#8b93a7" stroke-width="14"/>
+  <circle cx="331" cy="148" r="38" fill="none" stroke="#4eba65" stroke-width="11" opacity="0.45"/>
+  <circle cx="331" cy="148" r="24" fill="#4eba65"/>
+  <circle cx="168" cy="330" r="22" fill="#ff6b80"/>
+  <circle cx="352" cy="318" r="20" fill="#b1b9f9"/>
+  <circle cx="186" cy="182" r="16" fill="#e8ecf4" opacity="0.8"/>
+  <circle cx="256" cy="256" r="16" fill="#f0b43c"/>
+</svg>

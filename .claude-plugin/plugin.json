@@ -9,6 +9,7 @@
   "homepage": "https://github.com/floheissler/cc-worktree-radar",
   "repository": "https://github.com/floheissler/cc-worktree-radar",
   "supportUrl": "https://github.com/floheissler/cc-worktree-radar/issues",
+  "icon": "./assets/icon.svg",
   "license": "MIT",
   "keywords": [
     "git",
