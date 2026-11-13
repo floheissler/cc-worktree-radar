@@ -15,6 +15,9 @@ const BAND = {
   viewport: { columns: 140, rows: 40, isFullscreen: true },
   props: {
     hasSurvey: false,
+    // The engine's [-] (Ctrl+X Ctrl+A) hid the band: the radar draws on, as
+    // the engine shows its expand row only over a band that draws
+    isCollapsed: false,
     isWorking: false,
     maxRows: 30,
     bodyColumns: 135,
