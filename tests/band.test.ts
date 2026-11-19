@@ -1,4 +1,4 @@
-import type { On } from 'claude-code'
+import type { AgentInfo, On } from 'claude-code'
 import { describe, expect, mock, test, type Engine, type MockClock } from 'claude-code/testing'
 
 import { WAKE_NOTE } from '../hooks/changes'
@@ -891,10 +891,27 @@ function sessionsOf(...rows: readonly (readonly [name: string, worktree: string,
 }
 
 /**
- * An agent of the session's own, as `$.agent.list()` has it.
+ * An agent of the session's own, as `$.agent.list()` has it: a subagent in
+ * feat/landed's worktree that has made no request yet. The radar reads its
+ * `id`, `name`, `description` and `status`; the rest is what the engine
+ * gives such a subagent.
  */
-function ownAgent(status: 'running' | 'completed') {
-  return { id: 'abc', name: 'agent-abc', description: 'Fix the totals', type: 'general-purpose', status }
+function ownAgent(status: 'running' | 'completed'): AgentInfo {
+  return {
+    id: 'abc',
+    name: 'agent-abc',
+    description: 'Fix the totals',
+    type: 'general-purpose',
+    status,
+    kind: 'local_agent',
+    taskStatus: status,
+    label: 'Fix the totals',
+    startTime: NOW,
+    cwd: '/work/.claude/worktrees/landed',
+    tokenCount: 0,
+    tokenSamples: [],
+    hasRow: true,
+  }
 }
 
 /**
