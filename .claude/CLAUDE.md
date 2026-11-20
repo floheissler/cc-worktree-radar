@@ -69,7 +69,8 @@ and you are asked for the next item, start there.
   widths and `sanitize`, carried over from cc-file-explorer unchanged.
 - `tests/`: `claude plugin test` suites. `fixtures/repo.ts` is a recording
   of every git run of one read of a real test repository (paths rewritten to
-  `/work`); `replay.ts` answers git from it. `band.test.ts` mounts the band
+  `/work`), `fixtures/trunk.ts` two reads with a feature branch as the base;
+  `replay.ts` answers git from them. `band.test.ts` mounts the band
   and drives `/radar` and the tool through the engine, and sessions ending,
   starting and resuming over a store it reads.
 
@@ -113,6 +114,19 @@ the module otherwise:
   `tests/fixtures/repo.ts` that way when the git runs change. The
   recording predates the reflog read: its reflog runs replay as missing (no
   reflog), and the reflog's path is tested with runs a test adds.
+- Beside another base than the default branch (`baseOf` with no base
+  asked for: `origin/HEAD`'s, else `main`, else `master`), the default
+  branch is the trunk (`trunkOf`, `Snapshot.base.trunk`): in no lane, named
+  in the status line after the base (`[feat/big] off main +2`, the commits
+  it has that the base lacks). Found live: with `worktree.baseRef` set to
+  `head`, agents cut their worktrees from a feature branch checked out in
+  the main worktree, the radar opened on it, and `main` read CLEANUP
+  "landed in feat/big" (its tip in the base, its own commits in its
+  reflog), which a skill that cleans up landed branches without asking
+  would have deleted; once `main` moved on, it read READY to land on the
+  feature branch. Only the default branch: with nested bases the middle
+  one still reads landed, as a base cut from a branch and a branch
+  fast-forwarded into the base are the same in git.
 - A read runs only once a change has settled (`SETTLE_MS`), one at a time
   (`readNow` queues at most one more), and again every `REFRESH_MS` with no
   change seen. A poll is cheap: the branch tips, the worktree list, the

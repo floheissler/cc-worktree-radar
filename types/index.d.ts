@@ -153,6 +153,24 @@ export type BranchInfo = {
 }
 
 /**
+ * The repository's default branch, the one the radar takes as base when
+ * none is named (`origin/HEAD`'s, else `main`, else `master`), while the
+ * base is another branch: a feature branch its own worktrees land on. It is
+ * in no lane. Its tip is in the base, which read it as landed there, yet it
+ * is no branch to clean up; and its own new work is not the base's to land.
+ */
+export type Trunk = {
+  readonly name: string
+  readonly sha: string
+  /**
+   * Commits the trunk has that the base lacks (it moved on since the base
+   * left it), and commits the base has that the trunk lacks.
+   */
+  readonly ahead: number
+  readonly behind: number
+}
+
+/**
  * The radar's read of one repository.
  */
 export type Snapshot = {
@@ -176,6 +194,11 @@ export type Snapshot = {
      * and a branch made there moves the main worktree off the base.
      */
     readonly mainWorktreeSessions: readonly SessionInfo[]
+    /**
+     * The default branch, when the base is another branch; null when the
+     * base is the default branch, or there is none.
+     */
+    readonly trunk: Trunk | null
   }
   /**
    * Whether the running Claude sessions could be listed.

@@ -17,14 +17,15 @@ import {
   type Line,
 } from '../hooks/rows'
 import { cellWidth } from '../hooks/text'
-import { HOLDS } from './fixtures/repo'
-import { replayOf } from './replay'
+import { HOLDS, RUNS } from './fixtures/repo'
+import { FEATURE_BASE_RUNS, TRUNK_MOVED_RUNS } from './fixtures/trunk'
+import { replayOf, type Recorded } from './replay'
 
 const NOW = 1_800_000_000_000
 
-async function fixtureSnapshot(): Promise<Snapshot> {
+async function fixtureSnapshot(runs: Recorded = RUNS, base: string | null = null): Promise<Snapshot> {
   const result = await readSnapshot({
-    git: gitOf(replayOf().run, '/work'),
+    git: gitOf(replayOf(runs).run, '/work'),
     readText: async () => null,
     sessions: [],
     agents: [],
@@ -32,7 +33,7 @@ async function fixtureSnapshot(): Promise<Snapshot> {
     holds: HOLDS,
     comments: {},
     dueMarks: {},
-    base: null,
+    base,
     now: NOW,
   })
 
@@ -293,6 +294,40 @@ describe('the band laid out', () => {
     const message = bandLinesOf(modelOf(snapshot, { columns: 131, status: 'release v0.4.1 pending' })).at(-1)
 
     expect(textOf(message)).toMatch(/^work \[main\] · 4 ready · 2 rebase · .* · land next → feat\/parent +release v0\.4\.1 pending$/)
+  })
+
+  test('beside a feature branch as the base, names the default branch it is off', async () => {
+    const featureBase = await fixtureSnapshot(FEATURE_BASE_RUNS, 'feat/big')
+    const moved = await fixtureSnapshot(TRUNK_MOVED_RUNS, 'feat/big')
+    const footAt = (snapshot: Snapshot, columns: number) => textOf(bandLinesOf(modelOf(snapshot, { columns })).at(-1))
+
+    expect(footAt(featureBase, 140)).toBe('Worktree Radar · work [feat/big] off main · 1 ready · 1 cleanup · land next → worktree-agent-a')
+    // main moved on: the commits it has that feat/big lacks
+    expect(footAt(moved, 140)).toMatch(/^Worktree Radar · work \[feat\/big\] off main \+1 · 1 ready · /)
+    expect(bandLinesOf(modelOf(moved, { columns: 140 })).some(line => line.key === 'row:main')).toBe(false)
+
+    const placeRuns = bandLinesOf(modelOf(moved, { columns: 140 })).at(-1)?.segments ?? []
+
+    expect(placeRuns.find(segment => segment.text === ' off ')).toMatchObject({ dim: true })
+
+    // The help says why main is in no lane
+    const help = bandLinesOf(modelOf(moved, { columns: 140, isHelpShown: true })).map(textOf)
+
+    expect(help.some(text => /off main \+2 +main, the default branch, is in no lane: feat\/big is off it/.test(text))).toBe(true)
+    expect(bandLinesOf(modelOf(await fixtureSnapshot(), { columns: 140, isHelpShown: true })).map(textOf).some(text => text.includes(' off '))).toBe(false)
+
+    for (let columns = 1; columns <= 160; columns += 1) {
+      for (const [isCompact, isHelpShown] of [[false, false], [true, false], [false, true]] as const) {
+        for (const line of bandLinesOf(modelOf(moved, { columns, isCompact, isHelpShown }))) {
+          const room =
+            line.key === 'columns' || line.key === 'header'
+              ? columns - controlsCellsOf(controlsOf(columns, isHelpShown, isCompact))
+              : columns
+
+          expect(lineWidthOf(line), `${line.key} at ${columns}`).toBeLessThanOrEqual(Math.max(room, 0))
+        }
+      }
+    }
   })
 
   test('says who works in the main worktree, by name, or how many', async () => {

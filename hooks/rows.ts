@@ -675,13 +675,25 @@ function foldedLineOf(lane: Lane, branches: readonly BranchInfo[], columns: numb
 }
 
 /**
- * Where the radar looks: the repository and the base everything lands on.
+ * Where the radar looks: the repository and the base everything lands on;
+ * beside another base, the default branch it is off, kept out of the
+ * lanes, and the commits it has that the base lacks (`off main +2`).
  */
 function placeOf(model: BandModel, snapshot: Snapshot): Segment[] {
+  // A read made before the trunk was reported has none
+  const trunk = snapshot.base.trunk ?? null
+
   return [
     { text: sanitize(nameOf(snapshot.repo || model.root)) },
     { text: ' ' },
     { text: `[${sanitize(snapshot.base.name)}]`, color: baseColorOf(model.themeSetting) },
+    ...(trunk === null
+      ? []
+      : [
+          { text: ' off ', dim: true },
+          { text: sanitize(trunk.name) },
+          ...(trunk.ahead > 0 ? [{ text: ` +${trunk.ahead}` }] : []),
+        ]),
   ]
 }
 
@@ -908,7 +920,10 @@ export function bandLinesOf(model: BandModel): Line[] {
   const { snapshot } = model
 
   if (model.isHelpShown) {
-    return [headerOf(model, snapshot, columns), ...helpLinesOf(snapshot?.base.name ?? 'the base', columns)]
+    return [
+      headerOf(model, snapshot, columns),
+      ...helpLinesOf(snapshot?.base.name ?? 'the base', columns, snapshot?.base.trunk?.name ?? null),
+    ]
   }
 
   if (snapshot === null) {
@@ -1052,10 +1067,12 @@ const SIDE_BY_SIDE_COLUMNS = TERM_CELLS + 20
  *
  * @param base the base branch's name
  * @param columns the cells each line may take
+ * @param trunk the default branch, when the base is another; null else
  * @returns the help's lines, under the header
  */
-export function helpLinesOf(base: string, columns: number): Line[] {
+export function helpLinesOf(base: string, columns: number, trunk: string | null = null): Line[] {
   const onto = sanitize(base)
+  const off = trunk === null ? null : sanitize(trunk)
   const sections: readonly { readonly title: string; readonly entries: readonly HelpEntry[] }[] = [
     {
       title: 'Lanes',
@@ -1091,6 +1108,14 @@ export function helpLinesOf(base: string, columns: number): Line[] {
       title: 'Status line',
       entries: [
         { term: { text: `repo [${onto}]` }, meaning: `the repository, and the base branch everything lands on` },
+        ...(off === null
+          ? []
+          : [
+              {
+                term: { text: `off ${off} +2` },
+                meaning: `${off}, the default branch, is in no lane: ${onto} is off it, so it is neither work for ${onto} nor a branch to clean up. +2: commits ${off} has that ${onto} lacks`,
+              },
+            ]),
         { term: { text: '3 ready · 1 stacked' }, meaning: 'how many branches each lane holds' },
         { term: { text: 'land next → X' }, meaning: 'the branch ranked #1' },
         { term: { text: 'at the right' }, meaning: 'messages: a skill\'s line, uncommitted files in the main worktree, a failed read' },

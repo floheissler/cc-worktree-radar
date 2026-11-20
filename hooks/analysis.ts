@@ -1,4 +1,4 @@
-import type { BranchInfo, CallerComment, Hold, Lane, SessionInfo, Snapshot, WorktreeInfo } from '../types'
+import type { BranchInfo, CallerComment, Hold, Lane, SessionInfo, Snapshot, Trunk, WorktreeInfo } from '../types'
 
 import { mapLimit, type Git } from './git'
 import Limits from './limits'
@@ -275,7 +275,8 @@ async function read(input: ReadInput): Promise<ReadResult> {
     readWorktrees(git, input.readText),
     readOriginHead(git),
   ])
-  const base = baseOf(need(heads, 'the branches'), originHead, input.base)
+  const allHeads = need(heads, 'the branches')
+  const base = baseOf(allHeads, originHead, input.base)
 
   if (base === null) {
     return {
@@ -286,10 +287,17 @@ async function read(input: ReadInput): Promise<ReadResult> {
     }
   }
 
-  const allHeads = need(heads, 'the branches')
   const trees = need(worktrees, 'the worktrees')
   const baseHead = allHeads.get(base) as Head
   const baseSha = baseHead.sha
+  // With another base (a feature branch its worktrees land on), the default
+  // branch is the one the base came from. Its tip is in the base, so it read
+  // as landed there, CLEANUP, and a caller that cleans up landed branches
+  // deleted it; once it moved on, it read READY to land on the base. It is
+  // no work for the base and no branch to clean up: it stays out of the
+  // lanes, reported beside the base.
+  const trunkName = baseOf(allHeads, originHead, null)
+  const trunk = trunkName === null || trunkName === base ? null : await trunkOf(git, baseSha, trunkName, allHeads)
   const main = trees[0]?.path ?? place.top
   const attached = sessionsByWorktree(trees, input.sessions ?? [])
 
@@ -304,7 +312,7 @@ async function read(input: ReadInput): Promise<ReadResult> {
     }
   }
 
-  const names = [...allHeads.keys()].filter(name => name !== base).sort(compareText)
+  const names = [...allHeads.keys()].filter(name => name !== base && name !== trunk?.name).sort(compareText)
   const list = await mapLimit(names, Limits.GIT_PARALLEL, name => {
     const tree = byBranch.get(name)
 
@@ -519,6 +527,7 @@ async function read(input: ReadInput): Promise<ReadResult> {
         mainWorktreeSessions: (trees[0] ? (attached.get(trees[0].path) ?? []) : []).filter(
           session => session.kind !== 'session' || session.id !== input.self,
         ),
+        trunk,
       },
       areSessionsKnown: input.sessions !== null,
       next: ranked[0] ?? null,
@@ -526,6 +535,24 @@ async function read(input: ReadInput): Promise<ReadResult> {
       takenAt: input.now,
     },
   }
+}
+
+/**
+ * The default branch beside another base: how far each has gone without
+ * the other.
+ *
+ * @param git git
+ * @param baseSha the base's tip
+ * @param name the default branch
+ * @param heads the local branches
+ * @returns the trunk
+ */
+async function trunkOf(git: Git, baseSha: string, name: string, heads: ReadonlyMap<string, Head>): Promise<Trunk> {
+  const sha = (heads.get(name) as Head).sha
+  const counts = need(await git(['rev-list', '--left-right', '--count', `${baseSha}...${sha}`]), name).stdout
+  const [behind = 0, ahead = 0] = counts.trim().split(/\s+/).map(count => Number.parseInt(count, 10) || 0)
+
+  return { name, sha, ahead, behind }
 }
 
 function branchOf(info: Facts, facts: ReadonlyMap<string, Facts>, base: string, input: ReadInput): BranchInfo {

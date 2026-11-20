@@ -85,7 +85,7 @@ Then, in a session inside a git repository, run `/radar`.
 | Command | Does |
 |---|---|
 | `/radar` | Opens the radar on the session's repository, or closes it |
-| `/radar <base>` | Opens it with another base branch than the detected one (`origin/HEAD`, else `main`, else `master`) |
+| `/radar <base>` | Opens it with another base branch than the detected one (`origin/HEAD`, else `main`, else `master`), say a feature branch its own worktrees land on. The detected one, the default branch, then stays out of the lanes: the status line names it (`shop [feat/big] off main`) |
 | `/radar help` | Opens it on its help: what each lane, detail and comment means |
 | `/radar hold <branch> [reason]` | Parks a branch, say one that is done but waits on a review: it leaves the landing order (the ready lane and `next`) whatever else it shows. Only the radar records it: the branch and git stay as they are. Every session of the repository on this machine sees the hold until it is let go |
 | `/radar unhold <branch>` | Lets it go again |
@@ -118,7 +118,11 @@ The band is framed like a panel, with three controls in its header:
 
 Under the panel, the status line reads left to right: the title, the
 repository and its base (`shop [main]`), what each lane holds, and what
-lands next. Its right end holds messages: a skill's status line, who works
+lands next. With another base than the default branch, the default branch
+follows the base, with the commits it has that the base lacks: `shop
+[feat/big] off main +2`. It is in no lane: its tip is in the base, which
+would read it as landed there, yet it is no branch to clean up, and its own
+new work is not the base's to land. Its right end holds messages: a skill's status line, who works
 in the main worktree and what is uncommitted there (`main worktree: session
 fix-menu, 2 uncommitted`, work no row shows while the base is checked out
 there; the radar's own session is left out), a failed read. On a narrow band
@@ -202,7 +206,9 @@ told to land ready branches, a model does; told nothing, it reports.
 
 The snapshot is JSON (`schema: 1`): the repository, the base (`name`, `sha`,
 `upstream`, uncommitted files in the main worktree, `mainWorktreeSessions`:
-who works there but the radar's own session), whether sessions could be
+who works there but the radar's own session, and `trunk`: with another base
+than the default branch, the default branch's `name`, `sha`, `ahead` and
+`behind` the base, left out of `branches`), whether sessions could be
 listed, `next`, and per branch: `name`, `sha`, `lane`, `rank`, `ahead`,
 `behind`, `fileCount`, `insertions`, `deletions`, `lastCommitAt`, `upstream`,
 `conflicts`, `stackedOn`, `dependents`, `sharesWith`, `breaks` (branches that
@@ -286,6 +292,11 @@ transcript and no credential, and sends nothing anywhere. In detail:
   worktree. Your skill, Claude or you do that.
 - A branch landed by a squash merge still shows its commits as left to
   land: the base holds a rewritten copy of them.
+- Only the default branch stays out of the lanes beside another base. With
+  bases nested deeper (`feat/big-ui` cut from `feat/big`, cut from `main`),
+  the middle one, `feat/big`, reads as landed in `feat/big-ui`, a cleanup
+  candidate: no git fact tells the branch a base was cut from apart from
+  one that landed in it.
 - Without a reflog for a branch (none kept, or expired), a branch that
   landed by a fast-forward reads as never having had work: `nothing beyond
   main` rather than `landed in main`.

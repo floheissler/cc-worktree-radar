@@ -5,6 +5,7 @@ import type { Snapshot } from '../types'
 import { commentsAfter, readSnapshot, type ReadInput } from '../hooks/analysis'
 import { gitOf } from '../hooks/git'
 import { EXPECTED, HOLDS, NEXT, RUNS } from './fixtures/repo'
+import { FEATURE_BASE_RUNS, TRUNK_MOVED_RUNS } from './fixtures/trunk'
 import { replayOf } from './replay'
 
 function inputOf(run: ReturnType<typeof replayOf>['run'], changes: Partial<ReadInput> = {}): ReadInput {
@@ -280,6 +281,29 @@ describe('reading a repository', () => {
     // those
     expect(Object.keys(commentsAfter(comments, snapshot))).toEqual(['feat/big', 'feat/wip'])
     expect(commentsAfter({ 'feat/big': comments['feat/big'] }, snapshot)).toEqual({ 'feat/big': comments['feat/big'] })
+  })
+
+  test('keeps the default branch out of the lanes while a feature branch is the base', async () => {
+    // feat/big came from main; its agents' worktrees came from feat/big.
+    // main's tip is in feat/big, and its reflog holds commits of its own:
+    // it read as landed there, CLEANUP, and once it moved on, READY
+    const featureBase = await snapshotOf(inputOf(replayOf(FEATURE_BASE_RUNS).run, { base: 'feat/big' }))
+
+    expect(featureBase.branches.map(branch => [branch.name, branch.lane, branch.isLanded])).toEqual([
+      ['worktree-agent-a', 'READY', false],
+      ['worktree-agent-b', 'CLEANUP', true],
+    ])
+    expect(featureBase.base.trunk).toEqual({ name: 'main', sha: '102f6014d81784161d0c281dcef98f0298dcd2e5', ahead: 0, behind: 3 })
+
+    const moved = await snapshotOf(inputOf(replayOf(TRUNK_MOVED_RUNS).run, { base: 'feat/big' }))
+
+    expect(moved.branches.map(branch => branch.name)).toEqual(['worktree-agent-a', 'worktree-agent-b'])
+    expect(moved.next).toBe('worktree-agent-a')
+    expect(moved.base.trunk).toMatchObject({ name: 'main', ahead: 1, behind: 3 })
+
+    // With the default branch as the base, there is no trunk, named or not
+    expect((await snapshotOf(inputOf(replayOf().run))).base.trunk).toBeNull()
+    expect((await snapshotOf(inputOf(replayOf().run, { base: 'main' }))).base.trunk).toBeNull()
   })
 
   test('marks a branch due a rebase once nothing ahead of it conflicts', async () => {
