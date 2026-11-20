@@ -292,6 +292,48 @@ export function ownWorkOf(stdout: string): string | null {
 }
 
 /**
+ * The entry git writes when it makes a branch, however it is made (`git
+ * branch`, `checkout -b`, `switch -c`, `worktree add`; a literal in
+ * `branch.c`, never translated), naming the start point as it was given:
+ * `main`, `HEAD`, `main~1`, or, from Claude Code (2.1.326), `<sha>^{commit}`.
+ */
+const CREATED = /^branch: Created from (.+)$/
+
+/**
+ * Where a branch was made, by the oldest entry of its reflog (`git reflog
+ * show --format=%H%x00%gs`, newest first).
+ *
+ * @param stdout what git wrote
+ * @returns the commit it started at and the start point as given, or null
+ *   where its oldest entry is no creation: no reflog, or its start expired
+ */
+export function creationOf(stdout: string): { readonly sha: string; readonly from: string } | null {
+  const oldest = stdout.split('\n').filter(line => line.indexOf('\u0000') > 0).at(-1)
+  const at = oldest?.indexOf('\u0000') ?? -1
+  const created = oldest === undefined ? null : CREATED.exec(oldest.slice(at + 1))
+
+  return oldest === undefined || created === null
+    ? null
+    : { sha: oldest.slice(0, at), from: (created[1] ?? '').replace(/^refs\/heads\//, '') }
+}
+
+/**
+ * Every commit a branch's tip has been, by its reflog (`git reflog show
+ * --format=%H%x00%gs`).
+ *
+ * @param stdout what git wrote
+ * @returns the commits
+ */
+export function tipsOf(stdout: string): Set<string> {
+  return new Set(
+    stdout
+      .split('\n')
+      .filter(line => line.indexOf('\u0000') > 0)
+      .map(line => line.slice(0, line.indexOf('\u0000'))),
+  )
+}
+
+/**
  * Counts the lines of `git status --porcelain`.
  *
  * @param stdout what git wrote

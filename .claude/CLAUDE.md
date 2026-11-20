@@ -69,7 +69,8 @@ and you are asked for the next item, start there.
   widths and `sanitize`, carried over from cc-file-explorer unchanged.
 - `tests/`: `claude plugin test` suites. `fixtures/repo.ts` is a recording
   of every git run of one read of a real test repository (paths rewritten to
-  `/work`), `fixtures/trunk.ts` two reads with a feature branch as the base;
+  `/work`), `fixtures/trunk.ts` reads with a feature branch as the base,
+  nested bases among them;
   `replay.ts` answers git from them. `band.test.ts` mounts the band
   and drives `/radar` and the tool through the engine, and sessions ending,
   starting and resuming over a store it reads.
@@ -124,9 +125,25 @@ the module otherwise:
   "landed in feat/big" (its tip in the base, its own commits in its
   reflog), which a skill that cleans up landed branches without asking
   would have deleted; once `main` moved on, it read READY to land on the
-  feature branch. Only the default branch: with nested bases the middle
-  one still reads landed, as a base cut from a branch and a branch
-  fast-forwarded into the base are the same in git.
+  feature branch.
+- Beside a trunk, only the branches cut from the base are read
+  (`cutFrom`, `Snapshot.base.outside` for the rest, counted in the foot).
+  A branch's oldest reflog entry, `branch: Created from <start>` (every way
+  git makes a branch writes it, `branch.c`; checked on 2.53 for `branch`,
+  `checkout -b`/`-B`, `switch -c`, `worktree add`, `branch -f`), names the
+  commit it was made at (`creationOf`): cut from the base when that commit
+  is one the base's tip has been (`tipsOf`), or one a branch cut from it
+  has been, to a fixed point. A start named as a local branch (`main`)
+  decides instead: `git branch x main` at the commit the base was made at
+  is the trunk's. Claude Code names a commit (`<sha>^{commit}`, seen on
+  2.1.326 with a subagent's worktree), so its worktrees go by the commit.
+  Topology alone cannot tell this: a base cut from a branch and a branch
+  fast-forwarded into it look the same, and with `feat/big-ui` cut from
+  `feat/big` as the base, `feat/big` (the main worktree's branch) read
+  CLEANUP "landed in feat/big-ui". No creation entry (expired, none kept)
+  or no reflog for the base: the branch, or every branch, stays in, as
+  before. The default base is never filtered: a branch cut from
+  `origin/main` starts at a commit local `main` need not have been.
 - A read runs only once a change has settled (`SETTLE_MS`), one at a time
   (`readNow` queues at most one more), and again every `REFRESH_MS` with no
   change seen. A poll is cheap: the branch tips, the worktree list, the

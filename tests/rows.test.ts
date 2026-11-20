@@ -18,7 +18,7 @@ import {
 } from '../hooks/rows'
 import { cellWidth } from '../hooks/text'
 import { HOLDS, RUNS } from './fixtures/repo'
-import { FEATURE_BASE_RUNS, TRUNK_MOVED_RUNS } from './fixtures/trunk'
+import { FEATURE_BASE_RUNS, NESTED_RUNS, TRUNK_MOVED_RUNS } from './fixtures/trunk'
 import { replayOf, type Recorded } from './replay'
 
 const NOW = 1_800_000_000_000
@@ -315,6 +315,23 @@ describe('the band laid out', () => {
 
     expect(help.some(text => /off main \+2 +main, the default branch, is in no lane: feat\/big is off it/.test(text))).toBe(true)
     expect(bandLinesOf(modelOf(await fixtureSnapshot(), { columns: 140, isHelpShown: true })).map(textOf).some(text => text.includes(' off '))).toBe(false)
+
+    // The branches left out as not cut from the base: how many, at the right
+    const nested = await fixtureSnapshot(NESTED_RUNS, 'feat/big')
+
+    expect(footAt(nested, 160)).toMatch(/^Worktree Radar · work \[feat\/big\] off main \+1 · .* · land next → feat\/big-ui +3 branches not from feat\/big$/)
+    // A term too wide for the term column takes a line of its own
+    const term = help.findIndex(text => text === '  3 branches not from feat/big')
+
+    expect(help[term + 1]).toMatch(/^ {24}in no lane: their reflogs say/)
+
+    for (let columns = 1; columns <= 160; columns += 1) {
+      for (const line of bandLinesOf(modelOf(nested, { columns, status: 'merging feat/big-ui' }))) {
+        const room = line.key === 'columns' ? columns - controlsCellsOf(controlsOf(columns, false, false)) : columns
+
+        expect(lineWidthOf(line), `${line.key} at ${columns}`).toBeLessThanOrEqual(Math.max(room, 0))
+      }
+    }
 
     for (let columns = 1; columns <= 160; columns += 1) {
       for (const [isCompact, isHelpShown] of [[false, false], [true, false], [false, true]] as const) {

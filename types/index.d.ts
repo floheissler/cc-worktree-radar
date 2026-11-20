@@ -199,6 +199,17 @@ export type Snapshot = {
      * base is the default branch, or there is none.
      */
     readonly trunk: Trunk | null
+    /**
+     * Beside a trunk, the branches in no lane as not cut from the base:
+     * each one's reflog says it was made at a commit the base's tip never
+     * was (cut from the trunk, from a branch the base came from, from a
+     * sibling of the base), or from a branch named in its making that is
+     * neither the base nor cut from it. A branch cut from one cut from the
+     * base is the base's too. Empty without a trunk, and where the base has
+     * no reflog; a branch whose making its reflog no longer holds stays in
+     * the lanes.
+     */
+    readonly outside: readonly string[]
   }
   /**
    * Whether the running Claude sessions could be listed.

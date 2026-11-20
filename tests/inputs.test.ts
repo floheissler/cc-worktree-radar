@@ -50,7 +50,7 @@ describe('the radar tool', () => {
       toolJsonOf({
         schema: 1,
         repo: '/work',
-        base: { name: 'main', sha: 'a', upstream: null, mainWorktreeBranch: 'main', mainWorktreeDirty: 0, mainWorktreeSessions: [], trunk: null },
+        base: { name: 'main', sha: 'a', upstream: null, mainWorktreeBranch: 'main', mainWorktreeDirty: 0, mainWorktreeSessions: [], trunk: null, outside: [] },
         areSessionsKnown: true,
         next: null,
         takenAt: 0,

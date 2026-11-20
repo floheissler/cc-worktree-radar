@@ -887,6 +887,14 @@ function messagesOf(model: BandModel, snapshot: Snapshot): Segment[] {
     messages.push({ text: `main worktree: ${main.join(', ')}`, color: 'warning' })
   }
 
+  // Branches not cut from the base, left out: how many, so a branch left
+  // out by mistake does not go unseen
+  const outside = snapshot.base.outside?.length ?? 0
+
+  if (outside > 0) {
+    messages.push({ text: `${outside} branch${outside === 1 ? '' : 'es'} not from ${sanitize(snapshot.base.name)}`, dim: true })
+  }
+
   if (!snapshot.areSessionsKnown) {
     messages.push({ text: 'sessions unknown', dim: true })
   }
@@ -1115,6 +1123,10 @@ export function helpLinesOf(base: string, columns: number, trunk: string | null 
                 term: { text: `off ${off} +2` },
                 meaning: `${off}, the default branch, is in no lane: ${onto} is off it, so it is neither work for ${onto} nor a branch to clean up. +2: commits ${off} has that ${onto} lacks`,
               },
+              {
+                term: { text: `3 branches not from ${onto}` },
+                meaning: `in no lane: their reflogs say they were cut from ${off} or another branch, not from ${onto} or a branch cut from it`,
+              },
             ]),
         { term: { text: '3 ready · 1 stacked' }, meaning: 'how many branches each lane holds' },
         { term: { text: 'land next → X' }, meaning: 'the branch ranked #1' },
@@ -1153,12 +1165,22 @@ export function helpLinesOf(base: string, columns: number, trunk: string | null 
 
       if (isSideBySide) {
         const cells = lineWidthOf({ key: '', segments: term })
+        // A term too wide for its column (one naming a long base) takes a
+        // line of its own, its meaning under it in the meaning's column
+        const isAlone = cells >= TERM_CELLS
+
+        if (isAlone) {
+          lines.push({ key, segments: term })
+        }
 
         wrapWords(entry.meaning, columns - TERM_CELLS).forEach((text, at) => {
           lines.push({
             key: `${key}:${at}`,
             segments: fitSegments(
-              [...(at === 0 ? [...term, { text: ' '.repeat(Math.max(TERM_CELLS - cells, 0)) }] : [{ text: ' '.repeat(TERM_CELLS) }]), { text, dim: true }],
+              [
+                ...(at === 0 && !isAlone ? [...term, { text: ' '.repeat(TERM_CELLS - cells) }] : [{ text: ' '.repeat(TERM_CELLS) }]),
+                { text, dim: true },
+              ],
               columns,
             ),
           })

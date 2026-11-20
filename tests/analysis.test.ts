@@ -2,10 +2,10 @@ import { describe, expect, test } from 'claude-code/testing'
 
 import type { Snapshot } from '../types'
 
-import { commentsAfter, readSnapshot, type ReadInput } from '../hooks/analysis'
+import { commentsAfter, cutFrom, readSnapshot, type ReadInput } from '../hooks/analysis'
 import { gitOf } from '../hooks/git'
 import { EXPECTED, HOLDS, NEXT, RUNS } from './fixtures/repo'
-import { FEATURE_BASE_RUNS, TRUNK_MOVED_RUNS } from './fixtures/trunk'
+import { FEATURE_BASE_RUNS, NESTED_RUNS, TRUNK_MOVED_RUNS } from './fixtures/trunk'
 import { replayOf } from './replay'
 
 function inputOf(run: ReturnType<typeof replayOf>['run'], changes: Partial<ReadInput> = {}): ReadInput {
@@ -294,6 +294,7 @@ describe('reading a repository', () => {
       ['worktree-agent-b', 'CLEANUP', true],
     ])
     expect(featureBase.base.trunk).toEqual({ name: 'main', sha: '102f6014d81784161d0c281dcef98f0298dcd2e5', ahead: 0, behind: 3 })
+    expect(featureBase.base.outside).toEqual([])
 
     const moved = await snapshotOf(inputOf(replayOf(TRUNK_MOVED_RUNS).run, { base: 'feat/big' }))
 
@@ -304,6 +305,50 @@ describe('reading a repository', () => {
     // With the default branch as the base, there is no trunk, named or not
     expect((await snapshotOf(inputOf(replayOf().run))).base.trunk).toBeNull()
     expect((await snapshotOf(inputOf(replayOf().run, { base: 'main' }))).base.trunk).toBeNull()
+  })
+
+  test('beside a feature branch as the base, shows only what was cut from it, by the reflogs', async () => {
+    const lanesOf = (snapshot: Snapshot) => snapshot.branches.map(branch => [branch.name, branch.lane])
+    const big = await snapshotOf(inputOf(replayOf(NESTED_RUNS).run, { base: 'feat/big' }))
+
+    // Its agents, feat/big-ui and what was cut from that; not main's
+    // branches: feat/other, made where feat/big was but from main by name,
+    // chore/old, from an older commit, fix/late, from main after it moved on
+    expect(lanesOf(big)).toEqual([
+      ['feat/big-ui', 'READY'],
+      ['worktree-agent-a', 'READY'],
+      ['feat/big-ui-part', 'STACKED'],
+      ['worktree-agent-b', 'CLEANUP'],
+    ])
+    expect(big.base.outside).toEqual(['chore/old', 'feat/other', 'fix/late'])
+
+    // One level down, feat/big is where the base came from: neither landed
+    // in it nor its work, as are feat/big's agents
+    const ui = await snapshotOf(inputOf(replayOf(NESTED_RUNS).run, { base: 'feat/big-ui' }))
+
+    expect(lanesOf(ui)).toEqual([['feat/big-ui-part', 'READY']])
+    expect(ui.base.outside).toEqual(['chore/old', 'feat/big', 'feat/other', 'fix/late', 'worktree-agent-a', 'worktree-agent-b'])
+  })
+
+  test('a branch whose making its reflog does not hold stays in, and all do without the base\'s reflog', async () => {
+    const heads = new Map(['base', 'main', 'kept', 'gone', 'cut', 'stacked'].map(name => [name, { sha: name, committedAt: 0, upstream: null }]))
+    const logs: Record<string, string> = {
+      base: 'b2\u0000commit: b2\nb1\u0000branch: Created from HEAD\n',
+      kept: 'k2\u0000commit: k2\nk1\u0000commit: k1\n',
+      gone: 'm1\u0000branch: Created from main\n',
+      cut: 'c1\u0000commit: c1\nb2\u0000branch: Created from b2^{commit}\n',
+      stacked: 'c1\u0000branch: Created from c1^{commit}\n',
+    }
+    const others = ['cut', 'gone', 'kept', 'stacked']
+
+    expect(await cutFrom('base', others, heads, async name => logs[name] ?? null)).toEqual({
+      inside: ['cut', 'kept', 'stacked'],
+      outside: ['gone'],
+    })
+    expect(await cutFrom('base', others, heads, async name => (name === 'base' ? null : (logs[name] ?? null)))).toEqual({
+      inside: others,
+      outside: [],
+    })
   })
 
   test('marks a branch due a rebase once nothing ahead of it conflicts', async () => {

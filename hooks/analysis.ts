@@ -5,6 +5,7 @@ import Limits from './limits'
 import {
   baseOf,
   countStatus,
+  creationOf,
   displayPathOf,
   isDeletionOnly,
   ownWorkOf,
@@ -12,6 +13,7 @@ import {
   readHeads,
   readOriginHead,
   readWorktrees,
+  tipsOf,
   type Head,
   type Worktree,
 } from './repo'
@@ -312,7 +314,23 @@ async function read(input: ReadInput): Promise<ReadResult> {
     }
   }
 
-  const names = [...allHeads.keys()].filter(name => name !== base && name !== trunk?.name).sort(compareText)
+  const reflogs = new Map<string, Promise<string | null>>()
+  const reflogOf = (name: string): Promise<string | null> => {
+    const known = reflogs.get(name)
+
+    if (known !== undefined) {
+      return known
+    }
+
+    const log = git(['reflog', 'show', '--format=%H%x00%gs', `refs/heads/${name}`, '--']).then(out => out?.stdout ?? null)
+
+    reflogs.set(name, log)
+
+    return log
+  }
+  const others = [...allHeads.keys()].filter(name => name !== base && name !== trunk?.name).sort(compareText)
+  const { inside: names, outside } =
+    trunk === null ? { inside: others, outside: [] } : await cutFrom(base, others, allHeads, reflogOf)
   const list = await mapLimit(names, Limits.GIT_PARALLEL, name => {
     const tree = byBranch.get(name)
 
@@ -349,8 +367,8 @@ async function read(input: ReadInput): Promise<ReadResult> {
     done.filter(name => !of(name).isLanded),
     Limits.GIT_PARALLEL,
     async name => {
-      const reflog = await git(['reflog', 'show', '--format=%H%x00%gs', `refs/heads/${name}`, '--'])
-      const work = reflog === null ? null : ownWorkOf(reflog.stdout)
+      const reflog = await reflogOf(name)
+      const work = reflog === null ? null : ownWorkOf(reflog)
 
       if (work !== null && (await git(['merge-base', '--is-ancestor', work, baseSha])) !== null) {
         of(name).isLanded = true
@@ -528,6 +546,7 @@ async function read(input: ReadInput): Promise<ReadResult> {
           session => session.kind !== 'session' || session.id !== input.self,
         ),
         trunk,
+        outside,
       },
       areSessionsKnown: input.sessions !== null,
       next: ranked[0] ?? null,
@@ -553,6 +572,80 @@ async function trunkOf(git: Git, baseSha: string, name: string, heads: ReadonlyM
   const [behind = 0, ahead = 0] = counts.trim().split(/\s+/).map(count => Number.parseInt(count, 10) || 0)
 
   return { name, sha, ahead, behind }
+}
+
+/**
+ * Sorts the branches beside a base that is not the default branch: those
+ * cut from the base, or from a branch cut from it, and the rest, cut from
+ * the default branch or elsewhere. A branch's reflog names the commit it
+ * was made at: it was cut from the base when that commit is one the base's
+ * tip has been. Where it names the start point by a branch's name (`git
+ * branch x main`), that branch decides; Claude Code names a commit. A
+ * branch made at the commit the base was made at, from a start point that
+ * names no branch (`HEAD`, a commit), cannot be told from one cut from the
+ * base: it counts as cut from it. One whose
+ * reflog no longer holds its making counts too, as every branch did
+ * before, and so does every branch where the base has no reflog.
+ *
+ * @param base the base
+ * @param others the other branches, but the default one
+ * @param heads the local branches
+ * @param reflogOf a branch's reflog (`%H%x00%gs`), null where git failed
+ * @returns the branches cut from the base, and the others
+ */
+export async function cutFrom(
+  base: string,
+  others: readonly string[],
+  heads: ReadonlyMap<string, Head>,
+  reflogOf: (name: string) => Promise<string | null>,
+): Promise<{ inside: string[]; outside: string[] }> {
+  const baseLog = await reflogOf(base)
+  const tips = baseLog === null ? new Set<string>() : tipsOf(baseLog)
+
+  if (tips.size === 0) {
+    return { inside: [...others], outside: [] }
+  }
+
+  const branches = await mapLimit(others, Limits.GIT_PARALLEL, async name => {
+    const log = (await reflogOf(name)) ?? ''
+
+    return { name, creation: creationOf(log), tips: tipsOf(log) }
+  })
+  const inside = new Set<string>()
+  const take = (branch: (typeof branches)[number]): void => {
+    inside.add(branch.name)
+
+    for (const sha of branch.tips) {
+      tips.add(sha)
+    }
+  }
+
+  for (const branch of branches.filter(other => other.creation === null)) {
+    take(branch)
+  }
+
+  // A branch cut from one cut from the base is the base's too: each one
+  // taken in adds the commits its tip has been, until none is left to take
+  for (let grew = true; grew; ) {
+    grew = false
+
+    for (const branch of branches) {
+      const { creation } = branch
+
+      if (inside.has(branch.name) || creation === null) {
+        continue
+      }
+
+      const isNamed = creation.from !== branch.name && heads.has(creation.from)
+
+      if (isNamed ? creation.from === base || inside.has(creation.from) : tips.has(creation.sha)) {
+        take(branch)
+        grew = true
+      }
+    }
+  }
+
+  return { inside: others.filter(name => inside.has(name)), outside: others.filter(name => !inside.has(name)) }
 }
 
 function branchOf(info: Facts, facts: ReadonlyMap<string, Facts>, base: string, input: ReadInput): BranchInfo {

@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'claude-code/testing'
 
-import { baseOf, countStatus, displayPathOf, isDeletionOnly, ownWorkOf, parseHeads, parseWorktrees, type Head } from '../hooks/repo'
+import { baseOf, countStatus, creationOf, displayPathOf, isDeletionOnly, ownWorkOf, parseHeads, parseWorktrees, tipsOf, type Head } from '../hooks/repo'
 import { agentsByWorktree, claudeLockOf, folderKeyOf, parseSessions, sessionsByWorktree } from '../hooks/sessions'
 
 const head = (sha: string): Head => ({ sha, committedAt: 1, upstream: null })
@@ -93,6 +93,22 @@ describe('a branch\'s own work, by its reflog', () => {
     expect(ownWorkOf(reflog('aa11bb2 rebase (finish): refs/heads/x onto 6ad5234', '0f2f5e2 branch: Created from main'))).toBeNull()
     expect(ownWorkOf(reflog('cc33dd4 commit (merge): Merge branch \'main\'', '0f2f5e2 branch: Created from main'))).toBeNull()
     expect(ownWorkOf('')).toBeNull()
+  })
+
+  test('where it was made, and every commit its tip has been', () => {
+    expect(creationOf(reflog('78e5500 commit: a2', '34f3a76 branch: Created from HEAD'))).toEqual({ sha: '34f3a76', from: 'HEAD' })
+    expect(creationOf(reflog('6ad5234 branch: Created from refs/heads/feat/big'))).toEqual({ sha: '6ad5234', from: 'feat/big' })
+    // Claude Code names the commit it resolved its base to (2.1.326)
+    expect(creationOf(reflog('2201cc3 branch: Created from 2201cc3^{commit}'))).toEqual({ sha: '2201cc3', from: '2201cc3^{commit}' })
+    // Its making expired, or none was kept
+    expect(creationOf(reflog('78e5500 commit: a2', 'ab83293 commit: a1'))).toBeNull()
+    expect(creationOf(reflog('7f7b5c2 commit (initial): initial'))).toBeNull()
+    expect(creationOf('')).toBeNull()
+
+    expect(tipsOf(reflog('78e5500 commit: a2', '78e5500 reset: moving to HEAD', '34f3a76 branch: Created from HEAD'))).toEqual(
+      new Set(['78e5500', '34f3a76']),
+    )
+    expect(tipsOf('')).toEqual(new Set())
   })
 })
 

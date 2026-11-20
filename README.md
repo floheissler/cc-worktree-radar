@@ -85,7 +85,7 @@ Then, in a session inside a git repository, run `/radar`.
 | Command | Does |
 |---|---|
 | `/radar` | Opens the radar on the session's repository, or closes it |
-| `/radar <base>` | Opens it with another base branch than the detected one (`origin/HEAD`, else `main`, else `master`), say a feature branch its own worktrees land on. The detected one, the default branch, then stays out of the lanes: the status line names it (`shop [feat/big] off main`) |
+| `/radar <base>` | Opens it with another base branch than the detected one (`origin/HEAD`, else `main`, else `master`), say a feature branch its own worktrees land on. Then only the branches cut from it count, and the default branch is named in the status line (`shop [feat/big] off main`) |
 | `/radar help` | Opens it on its help: what each lane, detail and comment means |
 | `/radar hold <branch> [reason]` | Parks a branch, say one that is done but waits on a review: it leaves the landing order (the ready lane and `next`) whatever else it shows. Only the radar records it: the branch and git stay as they are. Every session of the repository on this machine sees the hold until it is let go |
 | `/radar unhold <branch>` | Lets it go again |
@@ -122,7 +122,16 @@ lands next. With another base than the default branch, the default branch
 follows the base, with the commits it has that the base lacks: `shop
 [feat/big] off main +2`. It is in no lane: its tip is in the base, which
 would read it as landed there, yet it is no branch to clean up, and its own
-new work is not the base's to land. Its right end holds messages: a skill's status line, who works
+new work is not the base's to land.
+
+Beside such a base, the radar shows only what was cut from it: from the
+base itself, or from a branch cut from it (`feat/big-ui` and its own
+`feat/big-ui-part`, say). A branch's reflog names the commit it was made
+at, and the base's reflog every commit its tip has been; where the
+branch was made from a branch by name (`git branch fix/x main`), that
+branch decides. The rest (the default branch's own work, the branch the
+base was cut from, the base's siblings) are in no lane, counted at the
+right of the status line: `3 branches not from feat/big`. Its right end holds messages: a skill's status line, who works
 in the main worktree and what is uncommitted there (`main worktree: session
 fix-menu, 2 uncommitted`, work no row shows while the base is checked out
 there; the radar's own session is left out), a failed read. On a narrow band
@@ -206,9 +215,10 @@ told to land ready branches, a model does; told nothing, it reports.
 
 The snapshot is JSON (`schema: 1`): the repository, the base (`name`, `sha`,
 `upstream`, uncommitted files in the main worktree, `mainWorktreeSessions`:
-who works there but the radar's own session, and `trunk`: with another base
+who works there but the radar's own session, `trunk`: with another base
 than the default branch, the default branch's `name`, `sha`, `ahead` and
-`behind` the base, left out of `branches`), whether sessions could be
+`behind` the base, and `outside`: the branches not cut from that base;
+neither is in `branches`), whether sessions could be
 listed, `next`, and per branch: `name`, `sha`, `lane`, `rank`, `ahead`,
 `behind`, `fileCount`, `insertions`, `deletions`, `lastCommitAt`, `upstream`,
 `conflicts`, `stackedOn`, `dependents`, `sharesWith`, `breaks` (branches that
@@ -292,11 +302,18 @@ transcript and no credential, and sends nothing anywhere. In detail:
   worktree. Your skill, Claude or you do that.
 - A branch landed by a squash merge still shows its commits as left to
   land: the base holds a rewritten copy of them.
-- Only the default branch stays out of the lanes beside another base. With
-  bases nested deeper (`feat/big-ui` cut from `feat/big`, cut from `main`),
-  the middle one, `feat/big`, reads as landed in `feat/big-ui`, a cleanup
-  candidate: no git fact tells the branch a base was cut from apart from
-  one that landed in it.
+- Beside a base other than the default branch, which branches were cut
+  from it comes from the reflogs. A branch made from the commit the base
+  was made at, by a start point that names no branch (`HEAD`, a commit, as
+  Claude Code's worktrees do), cannot be told from one cut from the base,
+  and counts as cut from it. A branch whose making its reflog no longer
+  holds (git expires entries after 90 days) stays in the lanes, as does
+  every branch if the base has no reflog. A branch fetched from a remote
+  starts at the remote's commit, often one the local base never was: one a
+  colleague cut from the base reads as not cut from it.
+- A radar on the default branch still shows everything, the work of a
+  feature branch's own worktrees too: nothing in git marks `feat/big` as a
+  base other branches land on first.
 - Without a reflog for a branch (none kept, or expired), a branch that
   landed by a fast-forward reads as never having had work: `nothing beyond
   main` rather than `landed in main`.
